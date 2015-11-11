@@ -34,6 +34,7 @@ import com.gemstone.gemfire.cache.execute.Function;
 import com.gemstone.gemfire.cache.execute.FunctionAdapter;
 import com.gemstone.gemfire.cache.execute.FunctionContext;
 import com.gemstone.gemfire.cache.execute.FunctionException;
+import com.gemstone.gemfire.cache.execute.FunctionInvocationTargetException;
 import com.gemstone.gemfire.cache.execute.FunctionService;
 import com.gemstone.gemfire.cache.execute.ResultCollector;
 import com.gemstone.gemfire.cache30.CacheTestCase;
@@ -337,8 +338,9 @@ public class MemberFunctionExecutionDUnitTest extends CacheTestCase {
         
         try {
           rc.getResult(30, TimeUnit.SECONDS);
+          fail("Should have seen an exception");
         } catch (Exception e) {
-          if(!(e.getCause() instanceof CacheClosedException)) {
+          if(!(e.getCause() instanceof FunctionInvocationTargetException)) {
             fail("failed", e);
           }
         }
