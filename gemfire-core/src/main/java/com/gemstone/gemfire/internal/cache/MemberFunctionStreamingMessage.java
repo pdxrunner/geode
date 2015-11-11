@@ -209,15 +209,6 @@ public class MemberFunctionStreamingMessage extends DistributionMessage implemen
       replyWithException(dm, rex);
       // thr = functionException.getCause();
     }
-    catch (CancelException exception) {
-      // bug 37026: this is too noisy...
-      // throw new CacheClosedException("remote system shutting down");
-      // thr = se; cache is closed, no point trying to send a reply
-      thr = null;
-      if (logger.isDebugEnabled()) {
-        logger.debug("shutdown caught, abandoning message: {}",exception.getMessage(), exception);
-      }
-    }
     catch (Exception exception) {
       if (logger.isDebugEnabled()) {
         logger.debug("Exception occured on remote member while executing Function: {}", this.functionObject.getId(), exception);
