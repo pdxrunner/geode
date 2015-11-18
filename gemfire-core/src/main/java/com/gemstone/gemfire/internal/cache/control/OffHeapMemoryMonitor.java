@@ -58,9 +58,9 @@ public class OffHeapMemoryMonitor implements ResourceMonitor, MemoryUsageListene
   // Set to true when setEvictionThreshold(...) is called.
   private boolean hasEvictionThreshold = false;
 
-  private OffHeapMemoryUsageListener offHeapMemoryUsageListener;
   private Thread memoryListenerThread;
   
+  private final OffHeapMemoryUsageListener offHeapMemoryUsageListener;
   private final InternalResourceManager resourceManager;
   private final ResourceAdvisor resourceAdvisor;
   private final GemFireCacheImpl cache;
@@ -80,6 +80,7 @@ public class OffHeapMemoryMonitor implements ResourceMonitor, MemoryUsageListene
     }
     
     this.log = cache.getLoggerI18n();
+    this.offHeapMemoryUsageListener = new OffHeapMemoryUsageListener(0L);
   }
 
   /**
@@ -92,7 +93,7 @@ public class OffHeapMemoryMonitor implements ResourceMonitor, MemoryUsageListene
         return;
       }
 
-      this.offHeapMemoryUsageListener = new OffHeapMemoryUsageListener(getBytesUsed());
+      this.offHeapMemoryUsageListener.offHeapMemoryUsed = getBytesUsed();
       ThreadGroup group = LoggingThreadGroup.createThreadGroup("OffHeapMemoryMonitor Threads", logger);
       Thread t = new Thread(group, this.offHeapMemoryUsageListener);
       t.setName(t.getName() + " OffHeapMemoryListener");
@@ -342,6 +343,14 @@ public class OffHeapMemoryMonitor implements ResourceMonitor, MemoryUsageListene
    * @return true if a new event might need to be sent
    */
   private boolean mightSendEvent(long bytesUsed) {
+    if (this.offHeapMemoryUsageListener.offHeapMemoryUsed != bytesUsed) {
+      // fix for GEODE-438
+      return true;
+    }
+    // We do the following if the memory is the same just in case
+    // corner cases exist in which even though the amount of memory
+    // has not changed the we might have a different state.
+    // It is possible that the following code is not needed.
     final MemoryEvent mre = this.mostRecentEvent;
     final MemoryState oldState = mre.getState();
     final MemoryThresholds thresholds = this.thresholds;
@@ -497,7 +506,10 @@ public class OffHeapMemoryMonitor implements ResourceMonitor, MemoryUsageListene
   
   class OffHeapMemoryUsageListener implements Runnable {
     volatile boolean stopRequested = false;
-    long offHeapMemoryUsed; // In bytes
+    /**
+     * volatile so that mightSendEvent can check it w/o syncing
+     */
+    volatile long offHeapMemoryUsed; // In bytes
     
     OffHeapMemoryUsageListener(final long offHeapMemoryUsed) {
       this.offHeapMemoryUsed = offHeapMemoryUsed;
