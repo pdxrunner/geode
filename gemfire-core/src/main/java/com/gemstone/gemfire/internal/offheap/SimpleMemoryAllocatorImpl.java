@@ -1450,27 +1450,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  public static class GemFireChunkType extends ChunkType {
-    private static final GemFireChunkType singleton = new GemFireChunkType();
-    public static GemFireChunkType singleton() { return singleton; }
-    
-    private GemFireChunkType() {}
-
-    @Override
-    public int getSrcType() {
-      return Chunk.SRC_TYPE_GFE;
-    }
-
-    @Override
-    public Chunk newChunk(long memoryAddress) {      
-      return new GemFireChunk(memoryAddress);
-    }
-
-    @Override
-    public Chunk newChunk(long memoryAddress, int chunkSize) {     
-      return new GemFireChunk(memoryAddress, chunkSize);
-    }
-  }
   public static class GemFireChunkSlice extends GemFireChunk {
     private final int offset;
     private final int capacity;
