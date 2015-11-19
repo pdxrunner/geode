@@ -1450,12 +1450,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  public static abstract class ChunkType {
-    public abstract int getSrcType();
-    public abstract Chunk newChunk(long memoryAddress);
-    public abstract Chunk newChunk(long memoryAddress, int chunkSize);
-  }
-  
   public static class GemFireChunkType extends ChunkType {
     private static final GemFireChunkType singleton = new GemFireChunkType();
     public static GemFireChunkType singleton() { return singleton; }
