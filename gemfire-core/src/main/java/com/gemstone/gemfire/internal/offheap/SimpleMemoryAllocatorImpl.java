@@ -74,8 +74,6 @@ import com.gemstone.gemfire.internal.cache.RegionEntry;
 import com.gemstone.gemfire.internal.cache.RegionEntryContext;
 import com.gemstone.gemfire.internal.lang.StringUtils;
 import com.gemstone.gemfire.internal.logging.LogService;
-import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk;
-import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.ConcurrentBag.Node;
 import com.gemstone.gemfire.internal.offheap.annotations.OffHeapIdentifier;
 import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
 import com.gemstone.gemfire.internal.shared.StringPrintWriter;
@@ -787,21 +785,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   
   public class FreeListManager {
     private final AtomicReferenceArray<SyncChunkStack> tinyFreeLists = new AtomicReferenceArray<SyncChunkStack>(TINY_FREE_LIST_COUNT);
-    // Deadcoding the BIG stuff. Idea is to have a bigger TINY list by default
-//    /**
-//     * Every allocated chunk smaller than BIG_MULTIPLE*BIG_FREE_LIST_COUNT but that is not tiny will allocate a chunk of memory that is a multiple of this value.
-//     * Sizes are always rounded up to the next multiple of this constant
-//     * so internal fragmentation will be limited to BIG_MULTIPLE-1 bytes per allocation
-//     * and on average will be BIG_MULTIPLE/2 given a random distribution of size requests.
-//     */
-//    public final static int BIG_MULTIPLE = TINY_MULTIPLE*8;
-//    /**
-//     * Number of free lists to keep for big allocations.
-//     */
-//    private final static int BIG_FREE_LIST_COUNT = 2048;
-//    private final static int BIG_OFFSET = (MAX_TINY/BIG_MULTIPLE*BIG_MULTIPLE);
-//    public final static int MAX_BIG = (BIG_MULTIPLE*BIG_FREE_LIST_COUNT) + BIG_OFFSET;
-//    private final AtomicReferenceArray<ConcurrentChunkStack> bigFreeLists = new AtomicReferenceArray<ConcurrentChunkStack>(BIG_FREE_LIST_COUNT);
     // hugeChunkSet is sorted by chunk size in ascending order. It will only contain chunks larger than MAX_TINY.
     private final ConcurrentSkipListSet<Chunk> hugeChunkSet = new ConcurrentSkipListSet<Chunk>();
     private final AtomicLong allocatedSize = new AtomicLong(0L);
@@ -849,10 +832,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
     public long getFreeMemory() {
       return getTotalMemory() - getUsedMemory();
-//      long result = getFreeFragmentMemory();
-//      result += getFreeTinyMemory();
-//      result += getFreeHugeMemory();
-//      return result;
     }
     public long getFreeFragmentMemory() {
       long result = 0;
@@ -874,16 +853,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       }
       return tinyFree;
     }
-//    public long getFreeBigMemory() {
-//      long bigFree = 0;
-//      for (int i=0; i < this.bigFreeLists.length(); i++) {
-//        ConcurrentChunkStack cl = this.bigFreeLists.get(i);
-//        if (cl != null) {
-//          bigFree += cl.computeTotalSize();
-//        }
-//      }
-//      return bigFree;
-//    }
     public long getFreeHugeMemory() {
       long hugeFree = 0;
       for (Chunk c: this.hugeChunkSet) {
@@ -891,16 +860,9 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       }
       return hugeFree;
     }
-//    private int getNearestBigMultiple(int size) {
-//      return (size-1-BIG_OFFSET)/BIG_MULTIPLE;
-//    }
 
     /**
-     * Each long in this array tells us how much of the corresponding slab is allocated.
-     */
-    //private final AtomicIntegerArray slabOffsets = new AtomicIntegerArray(getSlabs().length);
-    /**
-     * The slab id of the last slab we allocated from.
+     * The id of the last fragment we allocated from.
      */
     private final AtomicInteger lastFragmentAllocation = new AtomicInteger(0);
 
@@ -928,11 +890,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
     
     /**
-     * This is a bit of a hack. TODO add some timeout logic in case this thread never does another off heap allocation.
-     */
-//    private final ThreadLocal<Chunk> tlCache = new ThreadLocal<Chunk>();
-    
-    /**
      * Allocate a chunk of memory of at least the given size.
      * The basic algorithm is:
      * 1. Look for a previously allocated and freed chunk close to the size requested.
@@ -950,11 +907,8 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
      */
     @SuppressWarnings("synthetic-access")
     public Chunk allocate(int size, ChunkType chunkType) {
-      Chunk result = null; /*tlCache.get();
-      
-      if (result != null && result.getDataSize() == size) {
-        tlCache.set(null);
-      } else */{
+      Chunk result = null;
+      {
         assert size > 0;
         if (chunkType == null) {
           chunkType = GemFireChunk.TYPE;
@@ -983,8 +937,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       }
       if (size <= MAX_TINY) {
         return allocateTiny(size, useSlabs, chunkType);
-//      } else if (size <= MAX_BIG) {
-//        return allocateBig(size, useSlabs);
       } else {
         return allocateHuge(size, useSlabs, chunkType);
       }
@@ -1446,22 +1398,8 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
         stats.incFreeMemory(cSize);
         notifyListeners();
       }
-      /*Chunk oldTlChunk = this.tlCache.get();
-      this.tlCache.set(c);
-      if (oldTlChunk != null) {
-        int oldTlcSize = oldTlChunk.getSize();
-        if (oldTlcSize <= MAX_TINY) {
-          freeTiny(oldTlChunk);
-        } else if (oldTlcSize <= MAX_BIG) {
-          freeBig(oldTlChunk);
-        } else {
-          freeHuge(oldTlChunk);
-        }
-      }*/
       if (cSize <= MAX_TINY) {
         freeTiny(addr, cSize);
-//      } else if (cSize <= MAX_BIG) {
-//        freeBig(addr, cSize);
       } else {
         freeHuge(addr, cSize);
       }
@@ -1469,9 +1407,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     private void freeTiny(long addr, int cSize) {
       basicFree(addr, getNearestTinyMultiple(cSize), this.tinyFreeLists);
     }
-//    private void freeBig(long addr, int cSize) {
-//      basicFree(addr, getNearestBigMultiple(cSize), this.bigFreeLists);
-//    }
     private void basicFree(long addr, int idx, AtomicReferenceArray<SyncChunkStack> freeLists) {
       SyncChunkStack clq = freeLists.get(idx);
       if (clq != null) {
@@ -1490,13 +1425,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       this.hugeChunkSet.add(SimpleMemoryAllocatorImpl.this.chunkFactory.newChunk(addr)); // TODO make this a collection of longs
     }
   }
-  
-  
-  
-  
-  /*private Chunk newChunk(long addr, int chunkSize) {
-    return this.chunkFactory.newChunk(addr, chunkSize);
-  }*/
   
   private Chunk newFakeChunk(int chunkSize) {
     return new FakeChunk(chunkSize);
@@ -1675,7 +1603,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
    * to it in the cache. Instead the memoryAddress is stored in a primitive field in
    * the cache and if used it will then, if needed, create an instance of this class.
    */
-  public static abstract class Chunk extends OffHeapCachedDeserializable implements Comparable<Chunk>, ConcurrentBag.Node, MemoryBlock {
+  public static abstract class Chunk extends OffHeapCachedDeserializable implements Comparable<Chunk>, MemoryBlock {
     /**
      * The unsafe memory address of the first byte of this chunk
      */
@@ -2160,19 +2088,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       return getRefCount(this.memoryAddress);
     }
 
-    // By adding this one object ref to Chunk we are able to have free lists that only have memory overhead of a single objref per free item.
-    //private Node cbNodeNext;
-    @Override
-    public void setNextCBNode(Node next) {
-      throw new UnsupportedOperationException();
-      //this.cbNodeNext = next;
-    }
-
-    @Override
-    public Node getNextCBNode() {
-      throw new UnsupportedOperationException();
-      //return this.cbNodeNext;
-    }
     public static int getSize(long memAddr) {
       validateAddress(memAddr);
       return UnsafeMemoryChunk.readAbsoluteInt(memAddr+CHUNK_SIZE_OFFSET);
@@ -2452,122 +2367,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       return this.size;
     }
   }
-  /**
-   * Simple stack structure.
-   * The chunk in the top of this stack is pointed to by topAddr.
-   * Each next chunk is found be reading a long from the data in the previous chunk.
-   * An address of 0L means it is then end of the stack.
-   * This class has a subtle race condition in it between
-   * one thread doing a poll, allocating data into the chunk returned by poll,
-   * and then offering it back. Meanwhile another thread did a poll of the same head chunk,
-   * read some of the allocating data as the "next" address and then did the compareAndSet
-   * call and it worked because the first thread had already put it back in.
-   * So this class should not be used. Instead use SyncChunkStack.
-   * 
-   * @author darrel
-   *
-   */
-  public static class BuggyConcurrentChunkStack {
-    // all uses of topAddr are done using topAddrUpdater
-    @SuppressWarnings("unused")
-    private volatile long topAddr;
-    private static final AtomicLongFieldUpdater<BuggyConcurrentChunkStack> topAddrUpdater = AtomicLongFieldUpdater.newUpdater(BuggyConcurrentChunkStack.class, "topAddr");
-    
-    public BuggyConcurrentChunkStack(long addr) {
-      if (addr != 0L) validateAddress(addr);
-      this.topAddr = addr;
-    }
-    public BuggyConcurrentChunkStack() {
-      this.topAddr = 0L;
-    }
-    public boolean isEmpty() {
-      return topAddrUpdater.get(this) == 0L;
-    }
-    public void offer(long e) {
-      assert e != 0;
-      validateAddress(e);
-      long curHead;
-      do {
-        curHead = topAddrUpdater.get(this);
-        Chunk.setNext(e, curHead);
-      } while (!topAddrUpdater.compareAndSet(this, curHead, e));
-    }
-    public long poll() {
-      long result;
-      long newHead;
-      do {
-        result = topAddrUpdater.get(this);
-        if (result == 0L) return 0L;
-        newHead = Chunk.getNext(result);
-        
-      } while (!topAddrUpdater.compareAndSet(this, result, newHead));
-      if (newHead != 0L) validateAddress(newHead);
-      return result;
-    }
-    /**
-     * Removes all the Chunks from this stack
-     * and returns the address of the first chunk.
-     * The caller owns all the Chunks after this call.
-     */
-    public long clear() {
-      long result;
-      do {
-        result = topAddrUpdater.get(this);
-        if (result == 0L) return 0L;
-      } while (!topAddrUpdater.compareAndSet(this, result, 0L));
-      return result;
-    }
-    public void logSizes(LogWriter lw, String msg) {
-      long headAddr = topAddrUpdater.get(this);
-      long addr;
-      boolean concurrentModDetected;
-      do {
-        concurrentModDetected = false;
-        addr = headAddr;
-        while (addr != 0L) {
-          int curSize = Chunk.getSize(addr);
-          addr = Chunk.getNext(addr);
-          long curHead = topAddrUpdater.get(this);
-          if (curHead != headAddr) {
-            headAddr = curHead;
-            concurrentModDetected = true;
-            // Someone added or removed from the stack.
-            // So we break out of the inner loop and start
-            // again at the new head.
-            break;
-          }
-          // TODO construct a single log msg
-          // that gets reset on the concurrent mad.
-          lw.info(msg + curSize);
-        }
-      } while (concurrentModDetected);
-    }
-    public long computeTotalSize() {
-      long result;
-      long headAddr = topAddrUpdater.get(this);
-      long addr;
-      boolean concurrentModDetected;
-      do {
-        concurrentModDetected = false;
-        result = 0;
-        addr = headAddr;
-        while (addr != 0L) {
-          result += Chunk.getSize(addr);
-          addr = Chunk.getNext(addr);
-          long curHead = topAddrUpdater.get(this);
-          if (curHead != headAddr) {
-            headAddr = curHead;
-            concurrentModDetected = true;
-            // Someone added or removed from the stack.
-            // So we break out of the inner loop and start
-            // again at the new head.
-            break;
-          }
-        }
-      } while (concurrentModDetected);
-      return result;
-    }
-  }
   public static class SyncChunkStack {
     // Ok to read without sync but must be synced on write
     private volatile long topAddr;
@@ -2714,7 +2513,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   }
   
   /**
-   * A fragment is a chunk of memory that can have chunks allocated from it.
+   * A fragment is a block of memory that can have chunks allocated from it.
    * The allocations are always from the front so the free memory is always
    * at the end. The freeIdx keeps track of the first byte of free memory in
    * the fragment.
@@ -2819,330 +2618,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
 
-  public static class ConcurrentBag<E extends ConcurrentBag.Node> implements Iterable<E> {
-    public interface Node {
-      public void setNextCBNode(Node next);
-      public Node getNextCBNode();
-    }
-    private final AtomicReference<E> root = new AtomicReference<E>(null);
-    
-    public ConcurrentBag() {
-    }
-    public ConcurrentBag(int initialSize) {
-    }
-    @Override
-    public Iterator<E> iterator() {
-      // TODO this iterator is used a bunch in the compactor.
-      // If a concurrent poll is done while iterating then the
-      // iterator may return a element that has been removed from
-      // the bag by the poll call. This is ok currently because
-      // the next field on Node is only used by the bag and is not
-      // nulled out by the poll call.
-      return new Iterator<E>() {
-        private E nextElem = root.get();
-
-        @Override
-        public boolean hasNext() {
-          return this.nextElem != null;
-        }
-
-        @Override
-        public E next() {
-          if (!hasNext()) {
-            throw new NoSuchElementException();
-          }
-          E result = this.nextElem;
-          this.nextElem = (E)this.nextElem.getNextCBNode();
-          return result;
-        }
-
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException();
-        }
-      };
-    }
-    public void offer(E e) {
-      E tmp;
-      do {
-        tmp = this.root.get();
-        e.setNextCBNode(tmp);
-      } while (!this.root.compareAndSet(tmp, e));
-    }
-    public E poll() {
-      E result;
-      do {
-        result = this.root.get();
-        if (result == null) return null;
-      } while (!this.root.compareAndSet(result, (E)result.getNextCBNode()));
-      // we should probably do
-      // result.setNextCBNode(null);
-      // but this could mess up a concurrent iterator so for now leave it set.
-      // Since the objects added to the bag are never garbage having an extra
-      // reference to one is no big deal.
-      return result;
-    }
-  }
-  
-  public static class ConcurrentBagABQ<E> implements Iterable<E> {
-    private static final int FREE_LIST_SIZE = Integer.getInteger("gemfire.FREE_LIST_SIZE", 1024);
-    private final ArrayBlockingQueue<E> data;
-    
-    public ConcurrentBagABQ() {
-      this.data = new ArrayBlockingQueue<E>(FREE_LIST_SIZE);
-    }
-    public ConcurrentBagABQ(int initialSize) {
-      this.data = new ArrayBlockingQueue<E>(initialSize);
-    }
-    @Override
-    public Iterator<E> iterator() {
-      return this.data.iterator();
-    }
-    public void offer(E e) {
-      this.data.add(e);
-    }
-    public E poll() {
-      return this.data.poll();
-    }
-  }
-  /**
-   * The idea of this data structure is for it to be somewhat concurrent but to also not produce garbage.
-   * Since this bag is used to implement each free list it can contain entries that get promoted to oldgen.
-   * Note when used concurrently this structure does not maintain a pure FIFO ordering. That is why it is
-   * called a Bag instead of a List.
-   * 
-   * @author darrel
-   */
-  public static class ConcurrentBagBroken<E> implements Iterable<E> {
-    private static final int FREE_LIST_SIZE = Integer.getInteger("gemfire.FREE_LIST_SIZE", 1024);
-    private volatile AtomicReferenceArray<E> data;
-    private final AtomicInteger size = new AtomicInteger(0);
-    
-    public ConcurrentBagBroken() {
-      this.data = new AtomicReferenceArray<E>(FREE_LIST_SIZE);
-    }
-    public ConcurrentBagBroken(int initialSize) {
-      this.data = new AtomicReferenceArray<E>(initialSize);
-    }
-    @Override
-    public Iterator<E> iterator() {
-      return new Iterator<E>() {
-        private final AtomicReferenceArray<E> itData = data;
-        private int idx = 0;
-        private E nextElem = null;
-
-        @Override
-        public boolean hasNext() {
-          E next = null;
-          do {
-            if (this.idx >= this.itData.length()) {
-              next = null;
-              break;
-            }
-            next = this.itData.get(this.idx);
-            if (next == null) {
-              this.idx++;
-            }
-          } while (next == null);
-          this.nextElem = next;
-          return  next != null;
-        }
-
-        @Override
-        public E next() {
-          if (!hasNext()) {
-            throw new NoSuchElementException();
-          }
-          this.idx++;
-          return this.nextElem;
-        }
-
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException();
-        }
-      };
-    }
-    public void offer(E e) {
-      int idx = this.size.get();
-      int dataLength = this.data.length();
-      while (idx >= dataLength) {
-        grow(dataLength);
-        idx = this.size.get();
-        dataLength = this.data.length();
-      }
-      while (!this.data.compareAndSet(idx, null, e)) {
-        dataLength = this.data.length();
-        if (idx >= dataLength) {
-          grow(dataLength);
-        }
-        int oldIdx = idx;
-        idx = this.size.get();
-        if (oldIdx == idx && idx < dataLength-1) {
-          idx++;
-        }
-      }
-      // At this point we have put e in the data array.
-      // Now update the size pointer to help the next guy find
-      // the next slot.
-      // If concurrent offers have already happened then they will
-      // have set size to something even greater.
-      // if concurrent polls have already happened then they will
-      // have set size to something even less.
-      this.size.compareAndSet(idx, idx+1);
-    }
-    public E poll() {
-      int idx = -1;
-      E result;
-      do {
-        int oldIdx = idx;
-        idx = this.size.get();
-        if (idx == oldIdx && idx > 0) {
-          idx--;
-        }
-        if (idx == 0) {
-          // sync in case a concurrent grow is happening.
-          // this allows us to switch over to the new data array.
-          synchronized (this) {
-            idx = this.size.get();
-            if (idx == 0) {
-              return null;
-            }
-          }
-        }
-        result = this.data.getAndSet(idx-1, null);
-      } while (result == null);
-      // At this point we have taken result from the data array.
-      // Now update the size pointer to help the next guy.
-      // If concurrent polls have already happened then they will
-      // have set size to something even less.
-      // If concurrent offers have already happened then they will
-      // have set size to something even greater.
-      this.size.compareAndSet(idx, idx-1);
-      return result;
-    }
-    private synchronized void grow(int oldDataLength) {
-      // Note that concurrent polls may happen while we are in grow.
-      // So we need to use the atomic operations to copy the data.
-      if (this.data.length() != oldDataLength) return;
-      AtomicReferenceArray<E> newData = new AtomicReferenceArray<E>(oldDataLength*2);
-      int idx = 0;
-      for (int i=0; i < oldDataLength; i++) {
-        E e = this.data.getAndSet(i, null);
-        if (e != null) {
-          newData.lazySet(idx++, e);
-        }
-      }
-      this.data = newData;
-      this.size.set(idx);
-    }
-  }
-  public static class ConcurrentBagLQ<E> implements Iterable<E> {
-        private final ConcurrentLinkedQueue<E> delegate = new ConcurrentLinkedQueue<E>();
-//    private final CopyOnWriteArrayList<ArrayBlockingQueue<E>> metaList = new CopyOnWriteArrayList<ArrayBlockingQueue<E>>();
-//    private final AtomicInteger offerIdx = new AtomicInteger(0);
-//    private final AtomicInteger pollIdx = new AtomicInteger(0);
-//    private static final int CHUNK_SIZE = 1024;
-    
-    public ConcurrentBagLQ() {
-//      this.metaList.add(new ArrayBlockingQueue<E>(CHUNK_SIZE));
-    }
-    public ConcurrentBagLQ(int size) {
-    }
-
-    @Override
-    public Iterator<E> iterator() {
-      // This impl does not support concurrent updates
-//      return new Iterator<E>() {
-//        private final Iterator<ArrayBlockingQueue<E>> metaListIterator = metaList.iterator();
-//        private Iterator<E> qIterator = null;
-//
-//        @Override
-//        public boolean hasNext() {
-//          do {
-//            if (this.qIterator != null && this.qIterator.hasNext()) {
-//              return true;
-//            }
-//            if (this.metaListIterator.hasNext()) {
-//              this.qIterator = metaListIterator.next().iterator();
-//            } else {
-//              this.qIterator = null;
-//            }
-//          } while (this.qIterator != null);
-//          return false;
-//        }
-//
-//        @Override
-//        public E next() {
-//          if (!hasNext()) {
-//            throw new NoSuchElementException("No more values in iterator");
-//          }
-//          return this.qIterator.next();
-//        }
-//
-//        @Override
-//        public void remove() {
-//          if (this.qIterator == null) {
-//            throw new IllegalStateException("next has not been called.");
-//          }
-//          this.qIterator.remove();
-//        }
-//      };
-      return this.delegate.iterator();
-    }
-    
-    public void offer(E e) {
-//      int start = this.offerIdx.get();
-//      for (int i=start; i >= 0; i--) {
-//        ArrayBlockingQueue<E> q = this.metaList.get(i);
-//        if (q.offer(e)) {
-//          if (i != start) {
-//            this.offerIdx.set(i);
-//          }
-//          return;
-//        }
-//      }
-//      for (int i=this.metaList.size()-1; i > start; i--) {
-//        ArrayBlockingQueue<E> q = this.metaList.get(i);
-//        if (q.offer(e)) {
-//          this.offerIdx.set(i);
-//          return;
-//        }
-//      }
-//      ArrayBlockingQueue<E> q = new ArrayBlockingQueue<E>(CHUNK_SIZE);
-//      q.offer(e);
-//      this.metaList.add(q);
-//      this.offerIdx.set(this.metaList.size()-1);
-      if (!this.delegate.offer(e)) {
-        throw new IllegalStateException("offer returned false");
-      }
-    }
-    public E poll() {
-//      int start = this.pollIdx.get();
-//      int end = this.metaList.size()-1;
-//      for (int i=start; i <= end; i++) {
-//        ArrayBlockingQueue<E> q = this.metaList.get(i);
-//        E result = q.poll();
-//        if (result != null) {
-//          if (i != start) {
-//            this.pollIdx.set(i);
-//          }
-//          return result;
-//        }
-//      }
-//      for (int i=0; i < start; i++) {
-//        ArrayBlockingQueue<E> q = this.metaList.get(i);
-//        E result = q.poll();
-//        if (result != null) {
-//          this.pollIdx.set(i);
-//          return result;
-//        }
-//      }
-//      return null;
-      return this.delegate.poll();
-    }
-  }
-  
   private void printSlabs() {
     for (int i =0; i < this.slabs.length; i++) {
       logger.info(slabs[i]);
@@ -3231,19 +2706,16 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
 
   @Override
   public List<MemoryBlock> getDeallocatedBlocks() {
-    // TODO Auto-generated method stub
     return null;
   }
 
   @Override
   public List<MemoryBlock> getUnusedBlocks() {
-    // TODO Auto-generated method stub
     return null;
   }
   
   @Override
   public MemoryBlock getBlockContaining(long memoryAddress) {
-    // TODO Auto-generated method stub
     return null;
   }
   
@@ -3272,13 +2744,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
           @Override
           public int compare(MemoryBlock o1, MemoryBlock o2) {
             return Long.valueOf(o1.getMemoryAddress()).compareTo(o2.getMemoryAddress());
-            /*if (o1.getMemoryAddress() < o2.getMemoryAddress()) {
-              return -1;
-            } else if (o1.getMemoryAddress() == o2.getMemoryAddress()) {
-              return 0;
-            } else {
-              return 1;
-            }*/
           }
     });
     return value;
