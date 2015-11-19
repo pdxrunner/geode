@@ -1424,32 +1424,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   }
   
   
-  /**
-   * Used to keep the heapForm around while an operation is still in progress.
-   * This allows the operation to access the serialized heap form instead of copying
-   * it from offheap. See bug 48135.
-   * 
-   * @author darrel
-   *
-   */
-  public static class ChunkWithHeapForm extends GemFireChunk {
-    private final byte[] heapForm;
-    
-    public ChunkWithHeapForm(GemFireChunk chunk, byte[] heapForm) {
-      super(chunk);
-      this.heapForm = heapForm;
-    }
-
-    @Override
-    protected byte[] getRawBytes() {
-      return this.heapForm;
-    }
-    
-    public Chunk getChunkWithoutHeapForm() {
-      return new GemFireChunk(this);
-    }
-  }
-  
   public static class FakeChunk extends Chunk {
     private final int size;
     public FakeChunk(int size) {

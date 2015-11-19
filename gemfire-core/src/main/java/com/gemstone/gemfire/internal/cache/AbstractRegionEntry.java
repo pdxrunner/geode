@@ -62,6 +62,7 @@ import com.gemstone.gemfire.internal.logging.LogService;
 import com.gemstone.gemfire.internal.logging.log4j.LocalizedMessage;
 import com.gemstone.gemfire.internal.logging.log4j.LogMarker;
 import com.gemstone.gemfire.internal.offheap.Chunk;
+import com.gemstone.gemfire.internal.offheap.ChunkWithHeapForm;
 import com.gemstone.gemfire.internal.offheap.GemFireChunk;
 import com.gemstone.gemfire.internal.offheap.MemoryAllocator;
 import com.gemstone.gemfire.internal.offheap.OffHeapCachedDeserializable;
@@ -1347,7 +1348,7 @@ public abstract class AbstractRegionEntry implements RegionEntry,
         val = ma.allocateAndInitialize(compressedData, isSerialized, isCompressed, GemFireChunk.TYPE); // TODO:KIRK:48068 race happens right after this line
         SimpleMemoryAllocatorImpl.setReferenceCountOwner(null);
         if (val instanceof GemFireChunk) {
-          val = new com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.ChunkWithHeapForm((GemFireChunk)val, data);
+          val = new com.gemstone.gemfire.internal.offheap.ChunkWithHeapForm((GemFireChunk)val, data);
         }
 //        if (val instanceof Chunk && r instanceof LocalRegion) {
 //          Chunk c = (Chunk) val;
