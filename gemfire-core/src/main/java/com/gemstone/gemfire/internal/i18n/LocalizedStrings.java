@@ -2057,8 +2057,6 @@ public class LocalizedStrings extends ParentLocalizedStrings {
 
   public static final StringId GatewayImpl_GATEWAY_0_HAS_BEEN_REBALANCED = new StringIdImpl(5621, "GatewaySender {0} has been rebalanced");
 
-  public static final StringId OffHeapMemoryMonitor_NO_OFF_HEAP_MEMORY_HAS_BEEN_CONFIGURED = new StringIdImpl(5622, "No off-heap memory has been configured.");
-
   public static final StringId Oplog_Close_Failed = new StringIdImpl(5640, "Failed to close file {0}");
   public static final StringId Oplog_PreAllocate_Failure = new StringIdImpl(5641, "Could not pre-allocate file {0} with size={1}");
   public static final StringId Oplog_PreAllocate_Failure_Init = new StringIdImpl(5642, "Could not create and pre grow file in dir {0} with size={1}");
