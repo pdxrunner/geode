@@ -3259,42 +3259,4 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       listener.beforeClose(allocator);
     }
   }
-  
-  /**
-   * Used by tests to get notifications about the lifecycle of a 
-   * SimpleMemoryAllocatorImpl.
-   * 
-   * @author Kirk Lund
-   */
-  public interface LifecycleListener {
-    /**
-     * Callback is invoked after creating a new SimpleMemoryAllocatorImpl. 
-     * 
-     * Create occurs during the first initialization of an 
-     * InternalDistributedSystem within the JVM.
-     * 
-     * @param allocator the instance that has just been created
-     */
-    public void afterCreate(SimpleMemoryAllocatorImpl allocator);
-    /**
-     * Callback is invoked after reopening an existing SimpleMemoryAllocatorImpl 
-     * for reuse. 
-     * 
-     * Reuse occurs during any intialization of an 
-     * InternalDistributedSystem after the first one was connected and then
-     * disconnected within the JVM.
-     * 
-     * @param allocator the instance that has just been reopened for reuse
-     */
-    public void afterReuse(SimpleMemoryAllocatorImpl allocator);
-    /**
-     * Callback is invoked before closing the SimpleMemoryAllocatorImpl
-     * 
-     * Close occurs after the InternalDistributedSystem and DistributionManager 
-     * have completely disconnected. 
-     * 
-     * @param allocator the instance that is about to be closed
-     */
-    public void beforeClose(SimpleMemoryAllocatorImpl allocator);
-  }
 }
