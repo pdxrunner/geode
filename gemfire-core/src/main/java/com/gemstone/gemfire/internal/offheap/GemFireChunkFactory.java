@@ -16,7 +16,6 @@
  */
 package com.gemstone.gemfire.internal.offheap;
 
-import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.GemFireChunk;
 
 /**
  * A ChunkFactory that produces chunks of type GemFireChunk.
