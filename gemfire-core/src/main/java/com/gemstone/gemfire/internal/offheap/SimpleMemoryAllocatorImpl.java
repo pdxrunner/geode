@@ -1450,28 +1450,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  public static class GemFireChunkSlice extends GemFireChunk {
-    private final int offset;
-    private final int capacity;
-    public GemFireChunkSlice(GemFireChunk gemFireChunk, int position, int limit) {
-      super(gemFireChunk);
-      this.offset = gemFireChunk.getBaseDataOffset() + position;
-      this.capacity = limit - position;
-    }
-    @Override
-    public int getDataSize() {
-      return this.capacity;
-    }
-    
-    @Override
-    protected long getBaseDataAddress() {
-      return super.getBaseDataAddress() + this.offset;
-    }
-    @Override
-    protected int getBaseDataOffset() {
-      return this.offset;
-    }
-  }
   public static class FakeChunk extends Chunk {
     private final int size;
     public FakeChunk(int size) {
