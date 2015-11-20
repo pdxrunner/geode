@@ -1150,7 +1150,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
     private Chunk allocateHuge(int size, boolean useFragments, ChunkType chunkType) {
       // sizeHolder is a fake Chunk used to search our sorted hugeChunkSet.
-      Chunk sizeHolder = newFakeChunk(size);
+      Chunk sizeHolder = new FakeChunk(size);
       NavigableSet<Chunk> ts = this.hugeChunkSet.tailSet(sizeHolder);
       Chunk result = ts.pollFirst();
       if (result != null) {
@@ -1223,22 +1223,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  private Chunk newFakeChunk(int chunkSize) {
-    return new FakeChunk(chunkSize);
-  }
-  
-  
-  public static class FakeChunk extends Chunk {
-    private final int size;
-    public FakeChunk(int size) {
-      super();
-      this.size = size;
-    }
-    @Override
-    public int getSize() {
-      return this.size;
-    }
-  }
   public static class SyncChunkStack {
     // Ok to read without sync but must be synced on write
     private volatile long topAddr;
