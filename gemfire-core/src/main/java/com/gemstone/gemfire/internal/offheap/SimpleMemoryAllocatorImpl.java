@@ -26,18 +26,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
@@ -50,7 +46,6 @@ import com.gemstone.gemfire.cache.CacheClosedException;
 import com.gemstone.gemfire.cache.Region;
 import com.gemstone.gemfire.distributed.internal.InternalDistributedSystem;
 import com.gemstone.gemfire.internal.cache.BucketRegion;
-import com.gemstone.gemfire.internal.cache.CachedDeserializableFactory;
 import com.gemstone.gemfire.internal.cache.GemFireCacheImpl;
 import com.gemstone.gemfire.internal.cache.LocalRegion;
 import com.gemstone.gemfire.internal.cache.PartitionedRegion;
@@ -137,7 +132,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       result.reuse(ooohml, lw, stats, offHeapMemorySize);
       lw.config("Reusing " + result.getTotalMemory() + " bytes of off-heap memory. The maximum size of a single off-heap object is " + result.largestSlab + " bytes.");
       created = true;
-      invokeAfterReuse(result);
+      LifecycleListener.invokeAfterReuse(result);
     } else {
       // allocate memory chunks
       //SimpleMemoryAllocatorImpl.cleanupPreviousAllocator();
@@ -169,7 +164,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       result = new SimpleMemoryAllocatorImpl(ooohml, stats, slabs);
       created = true;
       singleton = result;
-      invokeAfterCreate(result);
+      LifecycleListener.invokeAfterCreate(result);
     }
     } finally {
       if (!created) {
@@ -183,7 +178,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   public static SimpleMemoryAllocatorImpl create(OutOfOffHeapMemoryListener oooml, OffHeapMemoryStats stats, UnsafeMemoryChunk[] slabs) {
     SimpleMemoryAllocatorImpl result = new SimpleMemoryAllocatorImpl(oooml, stats, slabs);
     singleton = result;
-    invokeAfterCreate(result);
+    LifecycleListener.invokeAfterCreate(result);
     return result;
   }
   
@@ -437,7 +432,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   @Override
   public void close() {
     try {
-      invokeBeforeClose(this);
+      LifecycleListener.invokeBeforeClose(this);
     } finally {
       this.ooohml.close();
       if (Boolean.getBoolean(FREE_OFF_HEAP_MEMORY_PROPERTY)) {
@@ -1912,44 +1907,5 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
    */
   public static void forceCompaction() {
     getAllocator().freeList.compact(0);
-  }
-  
-  private static final List<LifecycleListener> lifecycleListeners = new CopyOnWriteArrayList<LifecycleListener>();
-  
-  /**
-   * Adds a LifecycleListener.
-   * @param listener the instance to add
-   */
-  public static void addLifecycleListener(LifecycleListener listener) {
-    lifecycleListeners.add(listener);
-  }
-  
-  /**
-   * Removes a LifecycleListener. Does nothing if the instance has not been added.
-   * @param listener the instance to remove
-   */
-  public static void removeLifecycleListener(LifecycleListener listener) {
-    lifecycleListeners.remove(listener);
-  }
-  
-  static void invokeAfterCreate(SimpleMemoryAllocatorImpl allocator) {
-    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
-      LifecycleListener listener = iter.next();
-      listener.afterCreate(allocator);
-    }
-  }
-  
-  static void invokeAfterReuse(SimpleMemoryAllocatorImpl allocator) {
-    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
-      LifecycleListener listener = iter.next();
-      listener.afterReuse(allocator);
-    }
-  }
-  
-  static  void invokeBeforeClose(SimpleMemoryAllocatorImpl allocator) {
-    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
-      LifecycleListener listener = iter.next();
-      listener.beforeClose(allocator);
-    }
   }
 }

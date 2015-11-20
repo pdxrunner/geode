@@ -16,6 +16,10 @@
  */
 package com.gemstone.gemfire.internal.offheap;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 /**
  * Used by tests to get notifications about the lifecycle of a 
  * SimpleMemoryAllocatorImpl.
@@ -23,6 +27,7 @@ package com.gemstone.gemfire.internal.offheap;
  * @author Kirk Lund
  */
 public interface LifecycleListener {
+
   /**
    * Callback is invoked after creating a new SimpleMemoryAllocatorImpl. 
    * 
@@ -52,4 +57,42 @@ public interface LifecycleListener {
    * @param allocator the instance that is about to be closed
    */
   public void beforeClose(SimpleMemoryAllocatorImpl allocator);
+  
+  static  void invokeBeforeClose(SimpleMemoryAllocatorImpl allocator) {
+    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
+      LifecycleListener listener = iter.next();
+      listener.beforeClose(allocator);
+    }
+  }
+  static void invokeAfterReuse(SimpleMemoryAllocatorImpl allocator) {
+    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
+      LifecycleListener listener = iter.next();
+      listener.afterReuse(allocator);
+    }
+  }
+  static void invokeAfterCreate(SimpleMemoryAllocatorImpl allocator) {
+    for (Iterator<LifecycleListener> iter = lifecycleListeners.iterator(); iter.hasNext();) {
+      LifecycleListener listener = iter.next();
+      listener.afterCreate(allocator);
+    }
+  }
+  /**
+   * Removes a LifecycleListener. Does nothing if the instance has not been added.
+   * @param listener the instance to remove
+   */
+  public static void removeLifecycleListener(LifecycleListener listener) {
+    lifecycleListeners.remove(listener);
+  }
+  /**
+   * Adds a LifecycleListener.
+   * @param listener the instance to add
+   */
+  public static void addLifecycleListener(LifecycleListener listener) {
+    LifecycleListener.lifecycleListeners.add(listener);
+  }
+
+  /**
+   * Following should be private but java 8 does not support that.
+   */
+  static final List<LifecycleListener> lifecycleListeners = new CopyOnWriteArrayList<LifecycleListener>();
 }
