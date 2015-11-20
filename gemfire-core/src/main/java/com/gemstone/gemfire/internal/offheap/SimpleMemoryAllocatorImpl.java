@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1395,112 +1394,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  /**
-   * A fragment is a block of memory that can have chunks allocated from it.
-   * The allocations are always from the front so the free memory is always
-   * at the end. The freeIdx keeps track of the first byte of free memory in
-   * the fragment.
-   * The base memory address and the total size of a fragment never change.
-   * During compaction fragments go away and are recreated.
-   * 
-   * @author darrel
-   *
-   */
-  public static class Fragment implements MemoryBlock {
-    private static long FILL_PATTERN = Chunk.FILL_PATTERN;
-    private static byte FILL_BYTE = Chunk.FILL_BYTE;
-    private final long baseAddr;
-    private final int size;
-    private volatile int freeIdx;
-    private static AtomicIntegerFieldUpdater<Fragment> freeIdxUpdater = AtomicIntegerFieldUpdater.newUpdater(Fragment.class, "freeIdx");
-    
-    public Fragment(long addr, int size) {
-      validateAddress(addr);
-      this.baseAddr = addr;
-      this.size = size;
-      freeIdxUpdater.set(this, 0);
-    }
-    
-    public int freeSpace() {
-      return getSize() - getFreeIndex();
-    }
-
-    public boolean allocate(int oldOffset, int newOffset) {
-      return freeIdxUpdater.compareAndSet(this, oldOffset, newOffset);
-    }
-
-    public int getFreeIndex() {
-      return freeIdxUpdater.get(this);
-    }
-
-    public int getSize() {
-      return this.size;
-    }
-
-    public long getMemoryAddress() {
-      return this.baseAddr;
-    }
-
-    @Override
-    public State getState() {
-      return State.UNUSED;
-    }
-
-    @Override
-    public MemoryBlock getNextBlock() {
-      throw new UnsupportedOperationException();
-    }
-    
-    @Override
-    public int getBlockSize() {
-      return freeSpace();
-    }
-    
-    @Override
-    public int getSlabId() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int getFreeListId() {
-      return -1;
-    }
-
-    @Override
-    public int getRefCount() {
-      return 0;
-    }
-
-    @Override
-    public String getDataType() {
-      return "N/A";
-    }
-
-    @Override
-    public boolean isSerialized() {
-      return false;
-    }
-
-    @Override
-    public boolean isCompressed() {
-      return false;
-    }
-
-    @Override
-    public Object getDataValue() {
-      return null;
-    }
-    
-    public void fill() {
-      UnsafeMemoryChunk.fill(this.baseAddr, this.size, FILL_BYTE);
-    }
-
-    @Override
-    public ChunkType getChunkType() {
-      return null;
-    }
-  }
-
   private void printSlabs() {
     for (int i =0; i < this.slabs.length; i++) {
       logger.info(slabs[i]);
