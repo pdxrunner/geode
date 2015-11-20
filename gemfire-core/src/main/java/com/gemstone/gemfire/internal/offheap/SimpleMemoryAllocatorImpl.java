@@ -16,9 +16,7 @@
  */
 package com.gemstone.gemfire.internal.offheap;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,7 +59,6 @@ import com.gemstone.gemfire.internal.cache.RegionEntry;
 import com.gemstone.gemfire.internal.logging.LogService;
 import com.gemstone.gemfire.internal.offheap.annotations.OffHeapIdentifier;
 import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
-import com.gemstone.gemfire.internal.shared.StringPrintWriter;
 
 /**
  * This allocator is somewhat like an Arena allocator.
@@ -1748,7 +1745,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   private final static boolean trackFreedRefCounts = Boolean.getBoolean("gemfire.trackOffHeapFreedRefCounts");
   private final static ConcurrentMap<Long, List<RefCountChangeInfo>> stacktraces;
   private final static ConcurrentMap<Long, List<RefCountChangeInfo>> freedStacktraces;
-  private final static ThreadLocal<Object> refCountOwner;
+  final static ThreadLocal<Object> refCountOwner;
   private final static ThreadLocal<AtomicInteger> refCountReenterCount;
   static {
     if (trackRefCounts) {
@@ -1810,86 +1807,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     return result;
   }
   
-  @SuppressWarnings("serial")
-  public static class RefCountChangeInfo extends Throwable {
-    private final String threadName;
-    private final int rc;
-    private final Object owner;
-    private int dupCount;
-    
-    public RefCountChangeInfo(boolean decRefCount, int rc) {
-      super(decRefCount ? "FREE" : "USED");
-      this.threadName = Thread.currentThread().getName();
-      this.rc = rc;
-      this.owner = refCountOwner.get();
-    }
-    
-    public Object getOwner() {
-      return this.owner;
-    }
-
-    @Override
-    public String toString() {
-      ByteArrayOutputStream baos = new ByteArrayOutputStream(64*1024);
-      PrintStream ps = new PrintStream(baos);
-      ps.print(this.getMessage());
-      ps.print(" rc=");
-      ps.print(this.rc);
-      if (this.dupCount > 0) {
-        ps.print(" dupCount=");
-        ps.print(this.dupCount);
-      }
-      ps.print(" by ");
-      ps.print(this.threadName);
-      if (this.owner != null) {
-        ps.print(" owner=");
-        ps.print(this.owner.getClass().getName());
-        ps.print("@");
-        ps.print(System.identityHashCode(this.owner));
-      }
-      ps.println(": ");
-      StackTraceElement[] trace = getStackTrace();
-      // skip the initial elements from SimpleMemoryAllocatorImpl
-      int skip=0;
-      for (int i=0; i < trace.length; i++) {
-        if (!trace[i].getClassName().contains("SimpleMemoryAllocatorImpl")) {
-          skip = i;
-          break;
-        }
-      }
-      for (int i=skip; i < trace.length; i++) {
-        ps.println("\tat " + trace[i]);
-      }
-      ps.flush();
-      return baos.toString();
-    }
-    
-    public boolean isDuplicate(RefCountChangeInfo other) {
-      if (!getMessage().equals(other.getMessage())) return false;
-      String trace = getStackTraceString();
-      String traceOther = other.getStackTraceString();
-      if (trace.hashCode() != traceOther.hashCode()) return false;
-      if (trace.equals(traceOther)) {
-        this.dupCount++;
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    private String stackTraceString;
-    private String getStackTraceString() {
-      String result = this.stackTraceString;
-      if (result == null) {
-        StringPrintWriter spr = new StringPrintWriter();
-        printStackTrace(spr);
-        result = spr.getBuilder().toString();
-        this.stackTraceString = result;
-      }
-      return result;
-    }
-  }
-  
   private static final Object SKIP_REF_COUNT_TRACKING = new Object();
   
   public static void skipRefCountTracking() {
@@ -1921,17 +1838,17 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
             RefCountChangeInfo info = list.get(i);
             if (owner instanceof RegionEntry) {
               // use identity comparison on region entries since sqlf does some wierd stuff in the equals method
-              if (owner == info.owner) {
-                if (info.dupCount > 0) {
-                  info.dupCount--;
+              if (owner == info.getOwner()) {
+                if (info.getDupCount() > 0) {
+                  info.decDupCount();
                 } else {
                   list.remove(i);
                 }
                 return;
               }
-            } else if (owner.equals(info.owner)) {
-              if (info.dupCount > 0) {
-                info.dupCount--;
+            } else if (owner.equals(info.getOwner())) {
+              if (info.getDupCount() > 0) {
+                info.decDupCount();
               } else {
                 list.remove(i);
               }

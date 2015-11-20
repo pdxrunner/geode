@@ -23,8 +23,8 @@ import junit.framework.Assert;
 
 import com.gemstone.gemfire.cache.CacheClosedException;
 import com.gemstone.gemfire.internal.offheap.MemoryBlock;
+import com.gemstone.gemfire.internal.offheap.RefCountChangeInfo;
 import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl;
-import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.RefCountChangeInfo;
 
 @SuppressWarnings("deprecation")
 public class OffHeapTestUtil {
