@@ -16,7 +16,6 @@
  */
 package com.gemstone.gemfire.internal.offheap;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -39,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.apache.logging.log4j.Logger;
 
-import com.gemstone.gemfire.DataSerializer;
 import com.gemstone.gemfire.LogWriter;
 import com.gemstone.gemfire.OutOfOffHeapMemoryException;
 import com.gemstone.gemfire.cache.CacheClosedException;
@@ -1430,7 +1428,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     liveChunks.removeAll(regionChunks);
     List<MemoryBlock> orphans = new ArrayList<MemoryBlock>();
     for (Chunk chunk: liveChunks) {
-      orphans.add(new MemoryBlockNode(chunk));
+      orphans.add(new MemoryBlockNode(this, chunk));
     }
     Collections.sort(orphans, 
         new Comparator<MemoryBlock>() {
@@ -1519,19 +1517,19 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   
   private void addBlocksFromFragments(Collection<Fragment> src, List<MemoryBlock> dest) {
     for (MemoryBlock block : src) {
-      dest.add(new MemoryBlockNode(block));
+      dest.add(new MemoryBlockNode(this, block));
     }
   }
   
   private void addBlocksFromChunks(Collection<Chunk> src, List<MemoryBlock> dest) {
     for (Chunk chunk : src) {
-      dest.add(new MemoryBlockNode(chunk));
+      dest.add(new MemoryBlockNode(this, chunk));
     }
   }
   
   private void addMemoryBlocks(Collection<MemoryBlock> src, List<MemoryBlock> dest) {
     for (MemoryBlock block : src) {
-      dest.add(new MemoryBlockNode(block));
+      dest.add(new MemoryBlockNode(this, block));
     }
   }
   
@@ -1545,7 +1543,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       final long address = addr;
       final int freeListId = i;
       while (addr != 0L) {
-        value.add(new MemoryBlockNode(new MemoryBlock() {
+        value.add(new MemoryBlockNode(this, new MemoryBlock() {
           @Override
           public State getState() {
             return State.DEALLOCATED;
@@ -1599,135 +1597,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
       }
     }
     return value;
-  }
-  
-  public class MemoryBlockNode implements MemoryBlock {
-    private final MemoryBlock block;
-    MemoryBlockNode(MemoryBlock block) {
-      this.block = block;
-    }
-    @Override
-    public State getState() {
-      return this.block.getState();
-    }
-    @Override
-    public long getMemoryAddress() {
-      return this.block.getMemoryAddress();
-    }
-    @Override
-    public int getBlockSize() {
-      return this.block.getBlockSize();
-    }
-    @Override
-    public MemoryBlock getNextBlock() {
-      return getBlockAfter(this);
-    }
-    public int getSlabId() {
-      return findSlab(getMemoryAddress());
-    }
-    @Override
-    public int getFreeListId() {
-      return this.block.getFreeListId();
-    }
-    public int getRefCount() {
-      return this.block.getRefCount(); // delegate to fix GEODE-489
-    }
-    public String getDataType() {
-      if (this.block.getDataType() != null) {
-        return this.block.getDataType();
-      }
-      if (!isSerialized()) {
-        // byte array
-        if (isCompressed()) {
-          return "compressed byte[" + ((Chunk)this.block).getDataSize() + "]";
-        } else {
-          return "byte[" + ((Chunk)this.block).getDataSize() + "]";
-        }
-      } else if (isCompressed()) {
-        return "compressed object of size " + ((Chunk)this.block).getDataSize();
-      }
-      //Object obj = EntryEventImpl.deserialize(((Chunk)this.block).getRawBytes());
-      byte[] bytes = ((Chunk)this.block).getRawBytes();
-      return DataType.getDataType(bytes);
-    }
-    public boolean isSerialized() {
-      return this.block.isSerialized();
-    }
-    public boolean isCompressed() {
-      return this.block.isCompressed();
-    }
-    @Override
-    public Object getDataValue() {
-      String dataType = getDataType();
-      if (dataType == null || dataType.equals("N/A")) {
-        return null;
-      } else if (isCompressed()) {
-        return ((Chunk)this.block).getCompressedBytes();
-      } else if (!isSerialized()) {
-        // byte array
-        //return "byte[" + ((Chunk)this.block).getDataSize() + "]";
-        return ((Chunk)this.block).getRawBytes();
-      } else {
-        try {
-          byte[] bytes = ((Chunk)this.block).getRawBytes();
-          return DataSerializer.readObject(DataType.getDataInput(bytes));
-        } catch (IOException e) {
-          e.printStackTrace();
-          return "IOException:" + e.getMessage();
-        } catch (ClassNotFoundException e) {
-          e.printStackTrace();
-          return "ClassNotFoundException:" + e.getMessage();
-        } catch (CacheClosedException e) {
-          e.printStackTrace();
-          return "CacheClosedException:" + e.getMessage();
-        }
-      }
-    }
-    @Override
-    public String toString() {
-      final StringBuilder sb = new StringBuilder(MemoryBlock.class.getSimpleName());
-      sb.append("{");
-      sb.append("MemoryAddress=").append(getMemoryAddress());
-      sb.append(", State=").append(getState());
-      sb.append(", BlockSize=").append(getBlockSize());
-      sb.append(", SlabId=").append(getSlabId());
-      sb.append(", FreeListId=");
-      if (getState() == State.UNUSED || getState() == State.ALLOCATED) {
-        sb.append("NONE");
-      } else if (getFreeListId() == -1) {
-        sb.append("HUGE");
-      } else {
-        sb.append(getFreeListId());
-      }
-      sb.append(", RefCount=").append(getRefCount());
-      ChunkType ct = this.getChunkType();
-      if (ct != null) {
-        sb.append(", " + ct);
-      }
-      sb.append(", isSerialized=").append(isSerialized());
-      sb.append(", isCompressed=").append(isCompressed());
-      sb.append(", DataType=").append(getDataType());
-      {
-        sb.append(", DataValue=");
-        Object dataValue = getDataValue();
-        if (dataValue instanceof byte[]) {
-          byte[] ba = (byte[]) dataValue;
-          if (ba.length < 1024) {
-            sb.append(Arrays.toString(ba));
-          } else {
-            sb.append("<byte array of length " + ba.length + ">");
-          }
-        } else {
-          sb.append(dataValue);
-        }
-      }
-      sb.append("}");
-      return sb.toString();
-    }
-    @Override
-    public ChunkType getChunkType() {
-      return this.block.getChunkType();
-    }
   }
   
   /*
