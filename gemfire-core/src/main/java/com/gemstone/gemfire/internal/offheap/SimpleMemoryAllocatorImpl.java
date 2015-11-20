@@ -1223,105 +1223,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  public static class SyncChunkStack {
-    // Ok to read without sync but must be synced on write
-    private volatile long topAddr;
-    
-    public SyncChunkStack(long addr) {
-      if (addr != 0L) validateAddress(addr);
-      this.topAddr = addr;
-    }
-    public SyncChunkStack() {
-      this.topAddr = 0L;
-    }
-    public boolean isEmpty() {
-      return this.topAddr == 0L;
-    }
-    public void offer(long e) {
-      assert e != 0;
-      validateAddress(e);
-      synchronized (this) {
-        Chunk.setNext(e, this.topAddr);
-        this.topAddr = e;
-      }
-    }
-    public long poll() {
-      long result;
-      synchronized (this) {
-        result = this.topAddr;
-        if (result != 0L) {
-          this.topAddr = Chunk.getNext(result);
-        }
-      }
-      return result;
-    }
-    /**
-     * Removes all the Chunks from this stack
-     * and returns the address of the first chunk.
-     * The caller owns all the Chunks after this call.
-     */
-    public long clear() {
-      long result;
-      synchronized (this) {
-        result = this.topAddr;
-        if (result != 0L) {
-          this.topAddr = 0L;
-        }
-      }
-      return result;
-    }
-    public void logSizes(LogWriter lw, String msg) {
-      long headAddr = this.topAddr;
-      long addr;
-      boolean concurrentModDetected;
-      do {
-        concurrentModDetected = false;
-        addr = headAddr;
-        while (addr != 0L) {
-          int curSize = Chunk.getSize(addr);
-          addr = Chunk.getNext(addr);
-          long curHead = this.topAddr;
-          if (curHead != headAddr) {
-            headAddr = curHead;
-            concurrentModDetected = true;
-            // Someone added or removed from the stack.
-            // So we break out of the inner loop and start
-            // again at the new head.
-            break;
-          }
-          // TODO construct a single log msg
-          // that gets reset on the concurrent mad.
-          lw.info(msg + curSize);
-        }
-      } while (concurrentModDetected);
-    }
-    public long computeTotalSize() {
-      long result;
-      long headAddr = this.topAddr;
-      long addr;
-      boolean concurrentModDetected;
-      do {
-        concurrentModDetected = false;
-        result = 0;
-        addr = headAddr;
-        while (addr != 0L) {
-          result += Chunk.getSize(addr);
-          addr = Chunk.getNext(addr);
-          long curHead = this.topAddr;
-          if (curHead != headAddr) {
-            headAddr = curHead;
-            concurrentModDetected = true;
-            // Someone added or removed from the stack.
-            // So we break out of the inner loop and start
-            // again at the new head.
-            break;
-          }
-        }
-      } while (concurrentModDetected);
-      return result;
-    }
-  }
-  
   static void validateAddress(long addr) {
     validateAddressAndSize(addr, -1);
   }
@@ -1522,7 +1423,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     AtomicReferenceArray<SyncChunkStack> chunkStacks = this.freeList.tinyFreeLists;
     for (int i = 0; i < chunkStacks.length(); i++) {
       if (chunkStacks.get(i) == null) continue;
-      long addr = chunkStacks.get(i).topAddr;
+      long addr = chunkStacks.get(i).getTopAddress();
       final int size = Chunk.getSize(addr);
       final long address = addr;
       final int freeListId = i;
