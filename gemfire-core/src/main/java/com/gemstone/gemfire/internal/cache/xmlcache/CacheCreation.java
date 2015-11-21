@@ -547,11 +547,7 @@ public class CacheCreation implements InternalCache {
       cache.setRegionAttributes(id, attrs);
     }
 
-    Iterator it = this.roots.values().iterator();
-    while (it.hasNext()) {
-      RegionCreation r = (RegionCreation)it.next();
-      r.createRoot(cache);
-    }
+    initializeRegions(this.roots, cache);
 
     cache.readyDynamicRegionFactory();
 
@@ -563,19 +559,50 @@ public class CacheCreation implements InternalCache {
     Integer serverPort = CacheServerLauncher.getServerPort();
     String serverBindAdd = CacheServerLauncher.getServerBindAddress();
     Boolean disableDefaultServer = CacheServerLauncher.disableDefaultServer.get();
+    startBridgeServers(this.getCacheServers(), cache, serverPort, serverBindAdd, disableDefaultServer);
+    cache.setBackupFiles(this.backups);
+    cache.addDeclarableProperties(this.declarablePropertiesMap);
+    runInitializer();
+    cache.setInitializer(getInitializer(), getInitializerProps());
     
-    if (this.getCacheServers().size() > 1
+    // UnitTest CacheXml81Test.testCacheExtension
+    // Create all extensions
+    extensionPoint.fireCreate(cache);
+  }
+
+  protected void initializeRegions(Map declarativeRegions, Cache cache) {
+    Iterator it = declarativeRegions.values().iterator();
+    while (it.hasNext()) {
+      RegionCreation r = (RegionCreation)it.next();
+      if (cache.getRegion(r.getName()) != null) {
+        getLogger().info("Skipped initializing declarative region since one already exists (perhaps through cluster configuration)");
+        continue;
+      }
+      r.createRoot(cache);
+    }
+  }
+
+  protected void startBridgeServers(List declarativeCacheServer, Cache cache, Integer serverPort, String serverBindAdd, Boolean disableDefaultServer) {
+
+    //Is it that the cacheserver configured in the XML is always parameterized?
+    //Why cant the user define port in the XML
+    // Eg:
+    //   <cache-server port="50505"/> - We might annoy user throwing the exception
+    if (declarativeCacheServer.size() > 1
         && (serverPort != null || serverBindAdd != null)) {
       throw new RuntimeException(
           LocalizedStrings.CacheServerLauncher_SERVER_PORT_MORE_THAN_ONE_CACHE_SERVER
               .toLocalizedString());
     }
-    
-    if (this.getCacheServers().isEmpty()
+
+
+    //Creating a default cache server should not be the responsibility of cache creation
+    //In case if there is no XML configuration - We dont create a cache server, so how does the client gets one?
+    if (declarativeCacheServer.isEmpty()
         && (serverPort != null || serverBindAdd != null)
         && (disableDefaultServer == null || !disableDefaultServer)) {
       boolean existingCacheServer = false;
-      
+
       List<CacheServer> cacheServers = cache.getCacheServers();
       if (cacheServers != null) {
         for(CacheServer cacheServer : cacheServers) {
@@ -586,13 +613,27 @@ public class CacheCreation implements InternalCache {
       }
       
       if (!existingCacheServer) {
-        this.getCacheServers().add(new CacheServerCreation(cache, false));
+        declarativeCacheServer.add(new CacheServerCreation((GemFireCacheImpl)cache, false));
       }
     }
     
-    for (Iterator iter = this.getCacheServers().iterator(); iter.hasNext();) {
+    for (Iterator iter = declarativeCacheServer.iterator(); iter.hasNext();) {
       CacheServerCreation bridge = (CacheServerCreation)iter.next();
-      
+
+      boolean startServer = true;
+      List<CacheServer> cacheServers = cache.getCacheServers();
+      if (cacheServers != null) {
+        for (CacheServer cacheServer : cacheServers) {
+          if (bridge.getPort() == cacheServer.getPort()) {
+            startServer = false;
+          }
+        }
+      }
+
+      if (!startServer) {
+        continue;
+      }
+
       CacheServerImpl impl = (CacheServerImpl)cache.addCacheServer();
       impl.configureFrom(bridge);
 
