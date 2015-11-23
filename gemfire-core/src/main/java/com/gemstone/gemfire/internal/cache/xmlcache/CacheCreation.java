@@ -606,7 +606,7 @@ public class CacheCreation implements InternalCache {
       List<CacheServer> cacheServers = cache.getCacheServers();
       if (cacheServers != null) {
         for(CacheServer cacheServer : cacheServers) {
-          if (serverPort == cacheServer.getPort() && cacheServer.getBindAddress().equals(serverBindAdd)) {
+          if (serverPort == cacheServer.getPort()) {
             existingCacheServer = true;
           }
         }
@@ -655,14 +655,6 @@ public class CacheCreation implements InternalCache {
                 .toLocalizedString(impl), ex);
       }
     }
-    cache.setBackupFiles(this.backups);
-    cache.addDeclarableProperties(this.declarablePropertiesMap);
-    runInitializer();
-    cache.setInitializer(getInitializer(), getInitializerProps());
-    
-    // UnitTest CacheXml81Test.testCacheExtension
-    // Create all extensions
-    extensionPoint.fireCreate(cache);
   }
 
   /**
