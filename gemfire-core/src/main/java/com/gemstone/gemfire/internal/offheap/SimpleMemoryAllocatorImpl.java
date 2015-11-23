@@ -25,10 +25,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
@@ -368,8 +365,8 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     //System.out.println("allocating " + size);
     Chunk result = this.freeList.allocate(size, chunkType);
     //("allocated off heap object of size " + size + " @" + Long.toHexString(result.getMemoryAddress()), true);
-    if (trackReferenceCounts()) {
-      refCountChanged(result.getMemoryAddress(), false, 1);
+    if (ReferenceCountHelper.trackReferenceCounts()) {
+      ReferenceCountHelper.refCountChanged(result.getMemoryAddress(), false, 1);
     }
     return result;
   }
@@ -396,8 +393,8 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     Chunk result = this.freeList.allocate(v.length, chunkType);
     //debugLog("allocated off heap object of size " + v.length + " @" + Long.toHexString(result.getMemoryAddress()), true);
     //debugLog("allocated off heap object of size " + v.length + " @" + Long.toHexString(result.getMemoryAddress()) +  "chunkSize=" + result.getSize() + " isSerialized=" + isSerialized + " v=" + Arrays.toString(v), true);
-    if (trackReferenceCounts()) {
-      refCountChanged(result.getMemoryAddress(), false, 1);
+    if (ReferenceCountHelper.trackReferenceCounts()) {
+      ReferenceCountHelper.refCountChanged(result.getMemoryAddress(), false, 1);
     }
     assert result.getChunkType() == chunkType: "chunkType=" + chunkType + " getChunkType()=" + result.getChunkType();
     result.setSerializedValue(v);
@@ -840,172 +837,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
    * performance so turn on only when necessary.
    */
   final boolean validateMemoryWithFill = Boolean.getBoolean("gemfire.validateOffHeapWithFill");
-  
-  private final static boolean trackRefCounts = Boolean.getBoolean("gemfire.trackOffHeapRefCounts");
-  private final static boolean trackFreedRefCounts = Boolean.getBoolean("gemfire.trackOffHeapFreedRefCounts");
-  private final static ConcurrentMap<Long, List<RefCountChangeInfo>> stacktraces;
-  private final static ConcurrentMap<Long, List<RefCountChangeInfo>> freedStacktraces;
-  final static ThreadLocal<Object> refCountOwner;
-  private final static ThreadLocal<AtomicInteger> refCountReenterCount;
-  static {
-    if (trackRefCounts) {
-      stacktraces = new ConcurrentHashMap<Long, List<RefCountChangeInfo>>();
-      if (trackFreedRefCounts) {
-        freedStacktraces = new ConcurrentHashMap<Long, List<RefCountChangeInfo>>();
-      } else {
-        freedStacktraces = null;
-      }
-      refCountOwner = new ThreadLocal<Object>();
-      refCountReenterCount = new ThreadLocal<AtomicInteger>();
-    } else {
-      stacktraces = null;
-      freedStacktraces = null;
-      refCountOwner = null;
-      refCountReenterCount = null;
-    }
-  }
-  
-  public static boolean trackReferenceCounts() {
-    return trackRefCounts;
-  }
-  public static boolean trackFreedReferenceCounts() {
-    return trackFreedRefCounts;
-  }
-  public static void setReferenceCountOwner(Object owner) {
-    if (trackReferenceCounts()) {
-      if (refCountOwner.get() != null) {
-        AtomicInteger ai = refCountReenterCount.get();
-        if (owner != null) {
-          ai.incrementAndGet();
-        } else {
-          if (ai.decrementAndGet() <= 0) {
-            refCountOwner.set(null);
-            ai.set(0);
-          }
-        }
-      } else {
-        AtomicInteger ai = refCountReenterCount.get();
-        if (ai == null) {
-          ai = new AtomicInteger(0);
-          refCountReenterCount.set(ai);
-        }
-        if (owner != null) {
-          ai.set(1);
-        } else {
-          ai.set(0);
-        }
-        refCountOwner.set(owner);
-      }
-    }
-  }
-  public static Object createReferenceCountOwner() {
-    Object result = null;
-    if (trackReferenceCounts()) {
-      result = new Object();
-      setReferenceCountOwner(result);
-    }
-    return result;
-  }
-  
-  private static final Object SKIP_REF_COUNT_TRACKING = new Object();
-  
-  public static void skipRefCountTracking() {
-    setReferenceCountOwner(SKIP_REF_COUNT_TRACKING);
-  }
-  public static void unskipRefCountTracking() {
-    setReferenceCountOwner(null);
-  }
-  
-  static void refCountChanged(Long address, boolean decRefCount, int rc) {
-    final Object owner = refCountOwner.get();
-    if (owner == SKIP_REF_COUNT_TRACKING) {
-      return;
-    }
-    List<RefCountChangeInfo> list = stacktraces.get(address);
-    if (list == null) {
-      List<RefCountChangeInfo> newList = new ArrayList<RefCountChangeInfo>();
-      List<RefCountChangeInfo> old = stacktraces.putIfAbsent(address, newList);
-      if (old == null) {
-        list = newList;
-      } else {
-        list = old;
-      }
-    }
-    if (decRefCount) {
-      if (owner != null) {
-        synchronized (list) {
-          for (int i=0; i < list.size(); i++) {
-            RefCountChangeInfo info = list.get(i);
-            if (owner instanceof RegionEntry) {
-              // use identity comparison on region entries since sqlf does some wierd stuff in the equals method
-              if (owner == info.getOwner()) {
-                if (info.getDupCount() > 0) {
-                  info.decDupCount();
-                } else {
-                  list.remove(i);
-                }
-                return;
-              }
-            } else if (owner.equals(info.getOwner())) {
-              if (info.getDupCount() > 0) {
-                info.decDupCount();
-              } else {
-                list.remove(i);
-              }
-              return;
-            }
-          }
-        }
-      }
-    }
-    if (list == LOCKED) {
-      debugLog("refCount " + (decRefCount ? "deced" : "inced") + " after orphan detected for @" + Long.toHexString(address), true);
-      return;
-    }
-    RefCountChangeInfo info = new RefCountChangeInfo(decRefCount, rc);
-    synchronized (list) {
-//      if (list.size() == 16) {
-//        debugLog("dumping @" + Long.toHexString(address) + " history=" + list, false);
-//        list.clear();
-//      }
-      for (RefCountChangeInfo e: list) {
-        if (e.isDuplicate(info)) {
-          // No need to add it
-          return;
-        }
-      }
-      list.add(info);
-    }
-  }
-  
-  private static List<RefCountChangeInfo> LOCKED = Collections.emptyList();
-  
-  public static List<RefCountChangeInfo> getRefCountInfo(long address) {
-    if (!trackReferenceCounts()) return null;
-    List<RefCountChangeInfo> result = stacktraces.get(address);
-    while (result != null && !stacktraces.replace(address, result, LOCKED)) {
-      result = stacktraces.get(address);
-    }
-    return result;
-  }
-  public static List<RefCountChangeInfo> getFreeRefCountInfo(long address) {
-    if (!trackReferenceCounts() || !trackFreedReferenceCounts()) return null;
-    return freedStacktraces.get(address);
-  }
-  
-  public static void freeRefCountInfo(Long address) {
-    if (!trackReferenceCounts()) return;
-    List<RefCountChangeInfo> freedInfo = stacktraces.remove(address);
-    if (freedInfo == LOCKED) {
-      debugLog("freed after orphan detected for @" + Long.toHexString(address), true);
-    } else if (trackFreedReferenceCounts()) {
-      if (freedInfo != null) {
-        freedStacktraces.put(address, freedInfo);
-      } else {
-        freedStacktraces.remove(address);
-      }
-    }
-  }
   
   /** Used by tests to stress off-heap memory compaction.
    * 

@@ -671,8 +671,8 @@ import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
         }
       } while (!UnsafeMemoryChunk.writeAbsoluteIntVolatile(memAddr+REF_COUNT_OFFSET, rawBits, rawBits+1));
       //debugLog("use inced ref count " + (uc+1) + " @" + Long.toHexString(memAddr), true);
-      if (SimpleMemoryAllocatorImpl.trackReferenceCounts()) {
-        SimpleMemoryAllocatorImpl.refCountChanged(memAddr, false, uc+1);
+      if (ReferenceCountHelper.trackReferenceCounts()) {
+        ReferenceCountHelper.refCountChanged(memAddr, false, uc+1);
       }
 
       return true;
@@ -686,14 +686,14 @@ import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
         returnToAllocator = false;
         rawBits = UnsafeMemoryChunk.readAbsoluteIntVolatile(memAddr+REF_COUNT_OFFSET);
         if ((rawBits&MAGIC_MASK) != MAGIC_NUMBER) {
-          String msg = "It looks like off heap memory @" + Long.toHexString(memAddr) + " was already freed. rawBits=" + Integer.toHexString(rawBits) + " history=" + SimpleMemoryAllocatorImpl.getFreeRefCountInfo(memAddr);
+          String msg = "It looks like off heap memory @" + Long.toHexString(memAddr) + " was already freed. rawBits=" + Integer.toHexString(rawBits) + " history=" + ReferenceCountHelper.getFreeRefCountInfo(memAddr);
           //debugLog(msg, true);
           throw new IllegalStateException(msg);
         }
         int curCount = rawBits&REF_COUNT_MASK;
         if ((curCount) == 0) {
           //debugLog("too many frees @" + Long.toHexString(memAddr), true);
-          throw new IllegalStateException("Memory has already been freed." + " history=" + SimpleMemoryAllocatorImpl.getFreeRefCountInfo(memAddr) /*+ System.identityHashCode(this)*/);
+          throw new IllegalStateException("Memory has already been freed." + " history=" + ReferenceCountHelper.getFreeRefCountInfo(memAddr) /*+ System.identityHashCode(this)*/);
         }
         if (curCount == 1) {
           newCount = 0; // clear the use count, bits, and the delta size since it will be freed.
@@ -716,11 +716,11 @@ import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
         }
         */
        
-        if (SimpleMemoryAllocatorImpl.trackReferenceCounts()) {
-          if (SimpleMemoryAllocatorImpl.trackFreedReferenceCounts()) {
-            SimpleMemoryAllocatorImpl.refCountChanged(memAddr, true, newCount&REF_COUNT_MASK);
+        if (ReferenceCountHelper.trackReferenceCounts()) {
+          if (ReferenceCountHelper.trackFreedReferenceCounts()) {
+            ReferenceCountHelper.refCountChanged(memAddr, true, newCount&REF_COUNT_MASK);
           }
-          SimpleMemoryAllocatorImpl.freeRefCountInfo(memAddr);
+          ReferenceCountHelper.freeRefCountInfo(memAddr);
         }
         
         // Use fill pattern for free list data integrity check.
@@ -730,8 +730,8 @@ import com.gemstone.gemfire.internal.offheap.annotations.Unretained;
         
         SimpleMemoryAllocatorImpl.getAllocator().freeChunk(memAddr);
       } else {
-        if (SimpleMemoryAllocatorImpl.trackReferenceCounts()) {
-          SimpleMemoryAllocatorImpl.refCountChanged(memAddr, true, newCount&REF_COUNT_MASK);
+        if (ReferenceCountHelper.trackReferenceCounts()) {
+          ReferenceCountHelper.refCountChanged(memAddr, true, newCount&REF_COUNT_MASK);
         }
       }
     }

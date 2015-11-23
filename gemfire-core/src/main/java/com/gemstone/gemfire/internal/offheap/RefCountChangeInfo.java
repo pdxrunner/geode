@@ -31,11 +31,11 @@ public class RefCountChangeInfo extends Throwable {
   private final Object owner;
   private int dupCount;
   
-  public RefCountChangeInfo(boolean decRefCount, int rc) {
+  public RefCountChangeInfo(boolean decRefCount, int rc, Object owner) {
     super(decRefCount ? "FREE" : "USED");
     this.threadName = Thread.currentThread().getName();
     this.rc = rc;
-    this.owner = SimpleMemoryAllocatorImpl.refCountOwner.get();
+    this.owner = owner;
   }
   
   public Object getOwner() {
