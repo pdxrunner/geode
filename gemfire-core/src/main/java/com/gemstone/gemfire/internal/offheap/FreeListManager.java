@@ -226,7 +226,6 @@ public class FreeListManager {
         lw.info("OutOfOffHeapMemory allocating size of " + chunkSize + ". allocated=" + this.allocatedSize.get() + " compactions=" + this.compactCount.get() + " objects=" + this.ma.stats.getObjects() + " free=" + this.ma.stats.getFreeMemory() + " fragments=" + this.ma.stats.getFragments() + " largestFragment=" + this.ma.stats.getLargestFragment() + " fragmentation=" + this.ma.stats.getFragmentation());
         logFragmentState(lw);
         logTinyState(lw);
-//        logBigState(lw);
         logHugeState(lw);
       }
     }
@@ -236,14 +235,6 @@ public class FreeListManager {
         lw.info("Free huge of size " + c.getSize());
       }
     }
-//    private void logBigState(LogWriter lw) {
-//      for (int i=0; i < this.bigFreeLists.length(); i++) {
-//        ConcurrentChunkStack cl = this.bigFreeLists.get(i);
-//        if (cl != null) {
-//          cl.logSizes(lw, "Free big of size ");
-//        }
-//      }
-//    }
     private void logTinyState(LogWriter lw) {
       for (int i=0; i < this.tinyFreeLists.length(); i++) {
         SyncChunkStack cl = this.tinyFreeLists.get(i);
@@ -435,7 +426,6 @@ public class FreeListManager {
     private void collectFreeChunks(List<SyncChunkStack> l) {
       collectFreeFragmentChunks(l);
       collectFreeHugeChunks(l);
-//      collectFreeBigChunks(l);
       collectFreeTinyChunks(l);
     }
     private void collectFreeFragmentChunks(List<SyncChunkStack> l) {
@@ -481,17 +471,6 @@ public class FreeListManager {
         }
       }
     }
-//    private void collectFreeBigChunks(List<ConcurrentChunkStack> l) {
-//      for (int i=0; i < this.bigFreeLists.length(); i++) {
-//        ConcurrentChunkStack cl = this.bigFreeLists.get(i);
-//        if (cl != null) {
-//          long head = cl.clear();
-//          if (head != 0L) {
-//            l.add(new ConcurrentChunkStack(head));
-//          }
-//        }
-//      }
-//    }
     public void collectFreeHugeChunks(List<SyncChunkStack> l) {
       Chunk c = this.hugeChunkSet.pollFirst();
       SyncChunkStack result = null;
@@ -578,9 +557,6 @@ public class FreeListManager {
     private Chunk allocateTiny(int size, boolean useFragments, ChunkType chunkType) {
       return basicAllocate(getNearestTinyMultiple(size), SimpleMemoryAllocatorImpl.TINY_MULTIPLE, 0, this.tinyFreeLists, useFragments, chunkType);
     }
-//    private Chunk allocateBig(int size, boolean useFragments) {
-//      return basicAllocate(getNearestBigMultiple(size), BIG_MULTIPLE, BIG_OFFSET, this.bigFreeLists, useFragments);
-//    }
     private Chunk basicAllocate(int idx, int multiple, int offset, AtomicReferenceArray<SyncChunkStack> freeLists, boolean useFragments, ChunkType chunkType) {
       SyncChunkStack clq = freeLists.get(idx);
       if (clq != null) {
