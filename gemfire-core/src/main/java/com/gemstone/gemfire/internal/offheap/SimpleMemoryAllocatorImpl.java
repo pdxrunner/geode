@@ -18,7 +18,6 @@ package com.gemstone.gemfire.internal.offheap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -27,8 +26,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.atomic.AtomicReferenceArray;
-
 import org.apache.logging.log4j.Logger;
 
 import com.gemstone.gemfire.LogWriter;
@@ -617,12 +614,6 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
     }
   }
   
-  private void printSlabs() {
-    for (int i =0; i < this.slabs.length; i++) {
-      logger.info(slabs[i]);
-    }
-  }
-
   /** The inspection snapshot for MemoryInspector */
   private List<MemoryBlock> memoryBlocks;
   
@@ -691,16 +682,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   
   @Override
   public List<MemoryBlock> getAllocatedBlocks() {
-    final List<MemoryBlock> value = new ArrayList<MemoryBlock>();
-    addBlocksFromChunks(this.freeList.getLiveChunks(), value); // used chunks
-    Collections.sort(value, 
-        new Comparator<MemoryBlock>() {
-          @Override
-          public int compare(MemoryBlock o1, MemoryBlock o2) {
-            return Long.valueOf(o1.getMemoryAddress()).compareTo(o2.getMemoryAddress());
-          }
-    });
-    return value;
+    return this.freeList.getAllocatedBlocks();
   }
 
   @Override
@@ -733,103 +715,7 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
   }
 
   private List<MemoryBlock> getOrderedBlocks() {
-    final List<MemoryBlock> value = new ArrayList<MemoryBlock>();
-    addBlocksFromFragments(this.freeList.fragmentList, value); // unused fragments
-    addBlocksFromChunks(this.freeList.getLiveChunks(), value); // used chunks
-    addBlocksFromChunks(this.freeList.hugeChunkSet, value);    // huge free chunks
-    addMemoryBlocks(getTinyFreeBlocks(), value);           // tiny free chunks
-    Collections.sort(value, 
-        new Comparator<MemoryBlock>() {
-          @Override
-          public int compare(MemoryBlock o1, MemoryBlock o2) {
-            return Long.valueOf(o1.getMemoryAddress()).compareTo(o2.getMemoryAddress());
-          }
-    });
-    return value;
-  }
-  
-  private void addBlocksFromFragments(Collection<Fragment> src, List<MemoryBlock> dest) {
-    for (MemoryBlock block : src) {
-      dest.add(new MemoryBlockNode(this, block));
-    }
-  }
-  
-  private void addBlocksFromChunks(Collection<Chunk> src, List<MemoryBlock> dest) {
-    for (Chunk chunk : src) {
-      dest.add(new MemoryBlockNode(this, chunk));
-    }
-  }
-  
-  private void addMemoryBlocks(Collection<MemoryBlock> src, List<MemoryBlock> dest) {
-    for (MemoryBlock block : src) {
-      dest.add(new MemoryBlockNode(this, block));
-    }
-  }
-  
-  private List<MemoryBlock> getTinyFreeBlocks() {
-    List<MemoryBlock> value = new ArrayList<MemoryBlock>();
-    AtomicReferenceArray<SyncChunkStack> chunkStacks = this.freeList.tinyFreeLists;
-    for (int i = 0; i < chunkStacks.length(); i++) {
-      if (chunkStacks.get(i) == null) continue;
-      long addr = chunkStacks.get(i).getTopAddress();
-      final int size = Chunk.getSize(addr);
-      final long address = addr;
-      final int freeListId = i;
-      while (addr != 0L) {
-        value.add(new MemoryBlockNode(this, new MemoryBlock() {
-          @Override
-          public State getState() {
-            return State.DEALLOCATED;
-          }
-          @Override
-          public long getMemoryAddress() {
-            return address;
-          }
-          @Override
-          public int getBlockSize() {
-            return size;
-          }
-          @Override
-          public MemoryBlock getNextBlock() {
-            throw new UnsupportedOperationException();
-          }
-          @Override
-          public int getSlabId() {
-            throw new UnsupportedOperationException();
-          }
-          @Override
-          public int getFreeListId() {
-            return freeListId;
-          }
-          @Override
-          public int getRefCount() {
-            return 0;
-          }
-          @Override
-          public String getDataType() {
-            return "N/A";
-          }
-          @Override
-          public boolean isSerialized() {
-            return false;
-          }
-          @Override
-          public boolean isCompressed() {
-            return false;
-          }
-          @Override
-          public Object getDataValue() {
-            return null;
-          }
-          @Override
-          public ChunkType getChunkType() {
-            return null;
-          }
-        }));
-        addr = Chunk.getNext(addr);
-      }
-    }
-    return value;
+    return this.freeList.getOrderedBlocks();
   }
   
   /*
