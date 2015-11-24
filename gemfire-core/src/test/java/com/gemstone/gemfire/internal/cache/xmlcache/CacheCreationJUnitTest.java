@@ -53,25 +53,7 @@ public class CacheCreationJUnitTest {
   }
 
   @Test
-  public void declarativeRegionIsNotCreatedIfOneExistsAlready() {
-    CacheCreation cacheCreation = new CacheCreation();
-
-    RegionCreation declarativeRegion = mock(RegionCreation.class);
-    when(declarativeRegion.getName()).thenReturn("testRegion");
-
-    Map declarativeRegions = new HashMap();
-    declarativeRegions.put("testRegion", declarativeRegion);
-
-    when(cache.getRegion("testRegion")).thenReturn(mock(Region.class));
-
-    cacheCreation.initializeRegions(declarativeRegions, cache);
-
-    verify(declarativeRegion, never()).createRoot(cache);
-  }
-
-  @Test
-  //we dont know the desired behaviour
-  public void defaultCacheServerIsCreatedWithDefaultPortWhenNoDeclarativeServerIsConfigured() {
+  public void defaultCacheServerIsNotCreatedWithDefaultPortWhenNoDeclarativeServerIsConfigured() {
     Boolean disableDefaultCacheServer = false;
     Integer configuredServerPort = null;
     String configuredServerBindAddress = null;
