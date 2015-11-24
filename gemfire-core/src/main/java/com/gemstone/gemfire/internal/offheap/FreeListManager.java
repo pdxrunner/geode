@@ -40,7 +40,7 @@ import com.gemstone.gemfire.internal.offheap.MemoryBlock.State;
 public class FreeListManager {
   final private AtomicReferenceArray<SyncChunkStack> tinyFreeLists = new AtomicReferenceArray<SyncChunkStack>(SimpleMemoryAllocatorImpl.TINY_FREE_LIST_COUNT);
   // hugeChunkSet is sorted by chunk size in ascending order. It will only contain chunks larger than MAX_TINY.
-  final ConcurrentSkipListSet<Chunk> hugeChunkSet = new ConcurrentSkipListSet<Chunk>();
+  private final ConcurrentSkipListSet<Chunk> hugeChunkSet = new ConcurrentSkipListSet<Chunk>();
   private final AtomicLong allocatedSize = new AtomicLong(0L);
 
   private int getNearestTinyMultiple(int size) {
@@ -84,7 +84,7 @@ public class FreeListManager {
   public long getUsedMemory() {
     return this.allocatedSize.get();
   }
-  long getFreeMemory() {
+  public long getFreeMemory() {
     return this.ma.getTotalMemory() - getUsedMemory();
   }
   long getFreeFragmentMemory() {
@@ -119,7 +119,7 @@ public class FreeListManager {
    * The id of the last fragment we allocated from.
    */
   private final AtomicInteger lastFragmentAllocation = new AtomicInteger(0);
-  final CopyOnWriteArrayList<Fragment> fragmentList;
+  private final CopyOnWriteArrayList<Fragment> fragmentList;
   private final SimpleMemoryAllocatorImpl ma;
 
   public FreeListManager(SimpleMemoryAllocatorImpl ma) {
@@ -268,7 +268,7 @@ public class FreeListManager {
    * Or to prevent it from happening we could just check the incoming slabs and throw away a few bytes
    * to keep them from being contiguous.
    */
-  boolean compact(int chunkSize) {
+  private boolean compact(int chunkSize) {
     final long startCompactionTime = this.ma.getStats().startCompaction();
     final int countPreSync = this.compactCount.get();
     try {

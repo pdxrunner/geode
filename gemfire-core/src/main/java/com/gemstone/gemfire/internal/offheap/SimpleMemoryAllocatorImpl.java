@@ -724,10 +724,4 @@ public final class SimpleMemoryAllocatorImpl implements MemoryAllocator, MemoryI
    */
   final boolean validateMemoryWithFill = Boolean.getBoolean("gemfire.validateOffHeapWithFill");
   
-  /** Used by tests to stress off-heap memory compaction.
-   * 
-   */
-  public static void forceCompaction() {
-    getAllocator().freeList.compact(0);
-  }
 }
