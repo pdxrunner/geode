@@ -559,7 +559,7 @@ public class CacheCreation implements InternalCache {
     Integer serverPort = CacheServerLauncher.getServerPort();
     String serverBindAdd = CacheServerLauncher.getServerBindAddress();
     Boolean disableDefaultServer = CacheServerLauncher.disableDefaultServer.get();
-    startBridgeServers(this.getCacheServers(), cache, serverPort, serverBindAdd, disableDefaultServer);
+    startCacheServers(this.getCacheServers(), cache, serverPort, serverBindAdd, disableDefaultServer);
     cache.setBackupFiles(this.backups);
     cache.addDeclarableProperties(this.declarablePropertiesMap);
     runInitializer();
@@ -578,16 +578,20 @@ public class CacheCreation implements InternalCache {
     }
   }
 
-  protected void startBridgeServers(List declarativeCacheServer, Cache cache, Integer serverPort, String serverBindAdd, Boolean disableDefaultServer) {
+  /**
+   * starts declarative cache servers if a server is not running on the port already.
+   * Also adds a default server to the param declarativeCacheServers if a serverPort is specified.
+   */
+  protected void startCacheServers(List declarativeCacheServers, Cache cache, Integer serverPort, String serverBindAdd, Boolean disableDefaultServer) {
 
-    if (declarativeCacheServer.size() > 1
+    if (declarativeCacheServers.size() > 1
         && (serverPort != null || serverBindAdd != null)) {
       throw new RuntimeException(
           LocalizedStrings.CacheServerLauncher_SERVER_PORT_MORE_THAN_ONE_CACHE_SERVER
               .toLocalizedString());
     }
 
-    if (declarativeCacheServer.isEmpty()
+    if (declarativeCacheServers.isEmpty()
         && (serverPort != null || serverBindAdd != null)
         && (disableDefaultServer == null || !disableDefaultServer)) {
       boolean existingCacheServer = false;
@@ -602,18 +606,18 @@ public class CacheCreation implements InternalCache {
       }
       
       if (!existingCacheServer) {
-        declarativeCacheServer.add(new CacheServerCreation((GemFireCacheImpl)cache, false));
+        declarativeCacheServers.add(new CacheServerCreation((GemFireCacheImpl)cache, false));
       }
     }
     
-    for (Iterator iter = declarativeCacheServer.iterator(); iter.hasNext();) {
-      CacheServerCreation bridge = (CacheServerCreation)iter.next();
+    for (Iterator iter = declarativeCacheServers.iterator(); iter.hasNext();) {
+      CacheServerCreation declaredCacheServer = (CacheServerCreation)iter.next();
 
       boolean startServer = true;
       List<CacheServer> cacheServers = cache.getCacheServers();
       if (cacheServers != null) {
         for (CacheServer cacheServer : cacheServers) {
-          if (bridge.getPort() == cacheServer.getPort()) {
+          if (declaredCacheServer.getPort() == cacheServer.getPort()) {
             startServer = false;
           }
         }
@@ -624,7 +628,7 @@ public class CacheCreation implements InternalCache {
       }
 
       CacheServerImpl impl = (CacheServerImpl)cache.addCacheServer();
-      impl.configureFrom(bridge);
+      impl.configureFrom(declaredCacheServer);
 
       if (serverPort != null && serverPort != CacheServer.DEFAULT_PORT) {
         impl.setPort(serverPort);

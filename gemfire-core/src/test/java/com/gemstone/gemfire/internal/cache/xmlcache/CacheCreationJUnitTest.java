@@ -1,16 +1,12 @@
 package com.gemstone.gemfire.internal.cache.xmlcache;
 
-import com.gemstone.gemfire.cache.Region;
 import com.gemstone.gemfire.cache.server.CacheServer;
 import com.gemstone.gemfire.internal.cache.CacheServerImpl;
 import com.gemstone.gemfire.internal.cache.GemFireCacheImpl;
-import com.gemstone.gemfire.internal.i18n.LocalizedStrings;
 
 
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -66,7 +62,7 @@ public class CacheCreationJUnitTest {
     List<CacheServer> cacheServers = new ArrayList<>();
     when(cache.getCacheServers()).thenReturn(cacheServers);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, never()).addCacheServer();
   }
@@ -85,7 +81,7 @@ public class CacheCreationJUnitTest {
     List<CacheServer> cacheServers = new ArrayList<>();
     when(cache.getCacheServers()).thenReturn(cacheServers);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, never()).addCacheServer();
   }
@@ -104,7 +100,7 @@ public class CacheCreationJUnitTest {
     List<CacheServer> cacheServers = new ArrayList<>();
     when(cache.getCacheServers()).thenReturn(cacheServers);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, times(1)).addCacheServer();
     verify(mockServer).setPort(9999);
@@ -124,7 +120,7 @@ public class CacheCreationJUnitTest {
     CacheServerImpl mockServer = mock(CacheServerImpl.class);
     when(cache.addCacheServer()).thenReturn(mockServer);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, times(1)).addCacheServer();
     verify(mockServer).setPort(configuredServerPort);
@@ -150,7 +146,7 @@ public class CacheCreationJUnitTest {
 
     when(cache.getCacheServers()).thenReturn(cacheServers);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, never()).addCacheServer();
 
@@ -173,7 +169,7 @@ public class CacheCreationJUnitTest {
     CacheServerImpl mockServer = mock(CacheServerImpl.class);
     when(cache.addCacheServer()).thenReturn(mockServer);
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
 
     verify(cache, times(2)).addCacheServer();
     verify(mockServer).configureFrom(br1);
@@ -190,6 +186,6 @@ public class CacheCreationJUnitTest {
     cacheCreation.getCacheServers().add(new CacheServerCreation(cacheCreation, false));
     cacheCreation.getCacheServers().add(new CacheServerCreation(cacheCreation, false));
 
-    cacheCreation.startBridgeServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
+    cacheCreation.startCacheServers(cacheCreation.getCacheServers(), cache, configuredServerPort, configuredServerBindAddress, disableDefaultCacheServer);
   }
 }
