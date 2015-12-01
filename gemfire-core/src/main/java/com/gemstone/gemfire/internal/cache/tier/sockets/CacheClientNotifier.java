@@ -1,9 +1,18 @@
-/*=========================================================================
- * Copyright (c) 2002-2014 Pivotal Software, Inc. All Rights Reserved.
- * This product is protected by U.S. and international copyright
- * and intellectual property laws. Pivotal products are covered by
- * more patents listed at http://www.pivotal.io/patents.
- *=========================================================================
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.gemstone.gemfire.internal.cache.tier.sockets;
@@ -77,6 +86,8 @@ import com.gemstone.gemfire.internal.SocketCloser;
 import com.gemstone.gemfire.internal.SocketUtils;
 import com.gemstone.gemfire.internal.SystemTimer;
 import com.gemstone.gemfire.internal.Version;
+import com.gemstone.gemfire.internal.VersionedDataInputStream;
+import com.gemstone.gemfire.internal.VersionedDataOutputStream;
 import com.gemstone.gemfire.internal.cache.ClientServerObserver;
 import com.gemstone.gemfire.internal.cache.ClientServerObserverHolder;
 import com.gemstone.gemfire.internal.cache.ClientRegionEventImpl;
@@ -327,7 +338,11 @@ public class CacheClientNotifier {
     dis.readByte(); // replyCode
 
     if (Version.GFE_57.compareTo(clientVersion) <= 0) {
-        registerGFEClient(dis, dos, socket, isPrimary, startTime, clientVersion,
+      if (Version.CURRENT.compareTo(clientVersion) > 0) {
+        dis = new VersionedDataInputStream(dis, clientVersion);
+        dos = new VersionedDataOutputStream(dos, clientVersion);
+      }
+      registerGFEClient(dis, dos, socket, isPrimary, startTime, clientVersion,
             acceptorId, notifyBySubscription);
     } else {
         Exception e = new UnsupportedVersionException(clientVersionOrdinal);

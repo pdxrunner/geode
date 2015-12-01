@@ -1,9 +1,18 @@
-/*=========================================================================
- * Copyright (c) 2002-2014 Pivotal Software, Inc. All Rights Reserved.
- * This product is protected by U.S. and international copyright
- * and intellectual property laws. Pivotal products are covered by
- * more patents listed at http://www.pivotal.io/patents.
- *=========================================================================
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.gemstone.gemfire.internal.cache;
@@ -39,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -126,8 +136,6 @@ import com.gemstone.gemfire.cache.hdfs.internal.hoplog.HDFSForceCompactionFuncti
 import com.gemstone.gemfire.cache.hdfs.internal.hoplog.HDFSLastCompactionTimeFunction;
 import com.gemstone.gemfire.cache.hdfs.internal.hoplog.HDFSRegionDirector;
 import com.gemstone.gemfire.cache.hdfs.internal.hoplog.HDFSStoreDirector;
-import com.gemstone.gemfire.cache.lucene.LuceneService;
-import com.gemstone.gemfire.cache.lucene.LuceneServiceProvider;
 import com.gemstone.gemfire.cache.query.QueryService;
 import com.gemstone.gemfire.cache.query.internal.DefaultQuery;
 import com.gemstone.gemfire.cache.query.internal.DefaultQueryService;
@@ -200,6 +208,7 @@ import com.gemstone.gemfire.internal.cache.wan.parallel.ParallelGatewaySenderQue
 import com.gemstone.gemfire.internal.cache.xmlcache.CacheXmlParser;
 import com.gemstone.gemfire.internal.cache.xmlcache.CacheXmlPropertyResolver;
 import com.gemstone.gemfire.internal.cache.xmlcache.PropertyResolver;
+import com.gemstone.gemfire.internal.concurrent.ConcurrentHashSet;
 import com.gemstone.gemfire.internal.i18n.LocalizedStrings;
 import com.gemstone.gemfire.internal.jndi.JNDIInvoker;
 import com.gemstone.gemfire.internal.jta.TransactionManagerImpl;
@@ -239,7 +248,7 @@ import com.sun.jna.Platform;
  * @author Darrel Schneider
  */
 @SuppressWarnings("deprecation")
-public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePerfStats, DistributionAdvisee, Extensible<Cache> {
+public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePerfStats, DistributionAdvisee {
   private static final Logger logger = LogService.getLogger();
   
   // moved *SERIAL_NUMBER stuff to DistributionAdvisor
@@ -388,6 +397,12 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
    * {@link #allGatewaySendersLock}
    */
   private volatile Set<GatewaySender> allGatewaySenders = Collections.emptySet();
+  
+  /**
+   * The list of all async event queues added to the cache. 
+   * CopyOnWriteArrayList is used to allow concurrent add, remove and retrieval operations.
+   */
+  private volatile Set<AsyncEventQueue> allVisibleAsyncEventQueues = new CopyOnWriteArraySet<AsyncEventQueue>();
 
   /**
    * The list of all async event queues added to the cache. 
@@ -585,8 +600,10 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
   
   private final CqService cqService;
   
-  private final LuceneService luceneService;
-
+  private final Set<RegionListener> regionListeners = new ConcurrentHashSet<RegionListener>();
+  
+  private final Map<Class<? extends CacheService>, CacheService> services = new HashMap<Class<? extends CacheService>, CacheService>();
+  
   public static final int DEFAULT_CLIENT_FUNCTION_TIMEOUT = 0;
 
   private static int clientFunctionTimeout;
@@ -816,8 +833,6 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
       this.rootRegions = new HashMap();
       
       this.cqService = CqServiceProvider.create(this);
-
-      this.luceneService = LuceneServiceProvider.create(this);
 
       initReliableMessageQueueFactory();
 
@@ -1123,6 +1138,8 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     
     boolean completedCacheXml = false;
     
+    initializeServices();
+    
     try {
       //Deploy all the jars from the deploy working dir.
       new JarDeployer(this.system.getConfig().getDeployWorkingDir()).loadPreviouslyDeployedJars();
@@ -1156,6 +1173,18 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     clientFunctionTimeout = time >= 0 ? time : DEFAULT_CLIENT_FUNCTION_TIMEOUT;
 
     return this;
+  }
+
+  /**
+   * Initialize any services that provided as extensions to the cache using the
+   * service loader mechanism.
+   */
+  private void initializeServices() {
+    ServiceLoader<CacheService> loader = ServiceLoader.load(CacheService.class);
+    for(CacheService service : loader) {
+      service.init(this);
+      this.services.put(service.getInterface(), service);
+    }
   }
   
   private boolean isNotJmxManager(){
@@ -2176,10 +2205,6 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
             Set otherMembers = dm.getOtherDistributionManagerIds();
             ReplyProcessor21 processor = new ReplyProcessor21(system, otherMembers);
             CloseCacheMessage msg = new CloseCacheMessage();
-            // [bruce] if multicast is available, use it to send the message to
-            // avoid race conditions with cache content operations that might
-            // also be multicast
-            msg.setMulticast(system.getConfig().getMcastPort() != 0);
             msg.setRecipients(otherMembers);
             msg.setProcessorId(processor.getProcessorId());
             dm.putOutgoing(msg);
@@ -3023,6 +3048,7 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     stopper.checkCancelInProgress(null);
     LocalRegion.validateRegionName(name);
     RegionAttributes<K, V> attrs = p_attrs;
+    attrs = invokeRegionBefore(null, name, attrs, internalRegionArgs);
     if (attrs == null) {
       throw new IllegalArgumentException(LocalizedStrings.GemFireCache_ATTRIBUTES_MUST_NOT_BE_NULL.toLocalizedString());
     }
@@ -3158,6 +3184,7 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
       throw ex;
     }
 
+    invokeRegionAfter(rgn);
     /**
      * Added for M&M . Putting the callback here to avoid creating RegionMBean in case of Exception
      **/
@@ -3166,6 +3193,20 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     }
 
     return rgn;
+  }
+
+  public RegionAttributes invokeRegionBefore(LocalRegion parent,
+      String name, RegionAttributes attrs, InternalRegionArguments internalRegionArgs) {
+    for(RegionListener listener : regionListeners) {
+      attrs = listener.beforeCreate(parent, name, attrs, internalRegionArgs);
+    }
+    return attrs;
+  }
+  
+  public void invokeRegionAfter(LocalRegion region) {
+    for(RegionListener listener : regionListeners) {
+      listener.afterCreate(region);
+    }
   }
 
   /**
@@ -3713,6 +3754,19 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
       return cacheLifecycleListeners.remove(l);
     }
   }
+  
+  public void addRegionListener(RegionListener l ) {
+    this.regionListeners.add(l);
+  }
+  
+  public void removeRegionListener(RegionListener l ) {
+    this.regionListeners.remove(l);
+  }
+  
+  @SuppressWarnings("unchecked")
+  public <T extends CacheService> T getService(Class<T> clazz) {
+    return (T) services.get(clazz);
+  }
 
   /**
    * Creates the single instance of the Transation Manager for this cache. Returns the existing one upon request.
@@ -3881,8 +3935,11 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     }
   }
 
-  public void addAsyncEventQueue(AsyncEventQueue asyncQueue) {
+  public void addAsyncEventQueue(AsyncEventQueueImpl asyncQueue) {
     this.allAsyncEventQueues.add(asyncQueue);
+    if(!asyncQueue.isMetaQueue()) {
+      this.allVisibleAsyncEventQueues.add(asyncQueue);
+    }
     system
         .handleResourceEvent(ResourceEvent.ASYNCEVENTQUEUE_CREATE, asyncQueue);
   }
@@ -3925,7 +3982,7 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
   }
 
   public Set<AsyncEventQueue> getAsyncEventQueues() {
-    return this.allAsyncEventQueues;
+    return this.allVisibleAsyncEventQueues;
   }
   
   public AsyncEventQueue getAsyncEventQueue(String id) {
@@ -3949,6 +4006,7 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     // using gateway senders lock since async queue uses a gateway sender
     synchronized (allGatewaySendersLock) {
       this.allAsyncEventQueues.remove(asyncQueue);
+      this.allVisibleAsyncEventQueues.remove(asyncQueue);
     }
   }
   
@@ -4916,48 +4974,6 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
         c.setRegionAttributes(pra.toString(), af.create());
         break;
       }
-      case PARTITION_HDFS: {
-    	  AttributesFactory af = new AttributesFactory();
-          af.setDataPolicy(DataPolicy.HDFS_PARTITION);
-          PartitionAttributesFactory paf = new PartitionAttributesFactory();
-          af.setPartitionAttributes(paf.create());
-          af.setEvictionAttributes(EvictionAttributes.createLRUHeapAttributes(null, EvictionAction.OVERFLOW_TO_DISK));
-          af.setHDFSWriteOnly(false);
-          c.setRegionAttributes(pra.toString(), af.create());
-          break;
-        }
-      case PARTITION_REDUNDANT_HDFS: {
-    	  AttributesFactory af = new AttributesFactory();
-          af.setDataPolicy(DataPolicy.HDFS_PARTITION);
-          PartitionAttributesFactory paf = new PartitionAttributesFactory();
-          paf.setRedundantCopies(1);
-          af.setPartitionAttributes(paf.create());
-          af.setEvictionAttributes(EvictionAttributes.createLRUHeapAttributes(null, EvictionAction.OVERFLOW_TO_DISK));
-          af.setHDFSWriteOnly(false);
-          c.setRegionAttributes(pra.toString(), af.create());
-          break;
-        }
-      case PARTITION_WRITEONLY_HDFS_STORE: {
-        AttributesFactory af = new AttributesFactory();
-          af.setDataPolicy(DataPolicy.HDFS_PARTITION);
-          PartitionAttributesFactory paf = new PartitionAttributesFactory();
-          af.setPartitionAttributes(paf.create());
-          af.setEvictionAttributes(EvictionAttributes.createLRUHeapAttributes(null, EvictionAction.OVERFLOW_TO_DISK));
-          af.setHDFSWriteOnly(true);
-          c.setRegionAttributes(pra.toString(), af.create());
-          break;
-        }
-      case PARTITION_REDUNDANT_WRITEONLY_HDFS_STORE: {
-        AttributesFactory af = new AttributesFactory();
-          af.setDataPolicy(DataPolicy.HDFS_PARTITION);
-          PartitionAttributesFactory paf = new PartitionAttributesFactory();
-          paf.setRedundantCopies(1);
-          af.setPartitionAttributes(paf.create());
-          af.setEvictionAttributes(EvictionAttributes.createLRUHeapAttributes(null, EvictionAction.OVERFLOW_TO_DISK));
-          af.setHDFSWriteOnly(true);
-          c.setRegionAttributes(pra.toString(), af.create());
-          break;
-        }
       default:
         throw new IllegalStateException("unhandled enum " + pra);
       }
@@ -5351,12 +5367,6 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
     }
   }
   
-  @Override
-  public HDFSStoreFactory createHDFSStoreFactory() {
-    // TODO Auto-generated method stub
-    return new HDFSStoreFactoryImpl(this);
-  }
-  
   public HDFSStoreFactory createHDFSStoreFactory(HDFSStoreCreation creation) {
     return new HDFSStoreFactoryImpl(this, creation);
   }
@@ -5417,13 +5427,5 @@ public class GemFireCacheImpl implements InternalCache, ClientCache, HasCachePer
   
   public CqService getCqService() {
     return this.cqService;
-  }
-  
-  /**
-   * get reference to LuceneService singleton
-   * @return LuceneService
-   */
-  public LuceneService getLuceneService() {
-    return this.luceneService;
   }
 }

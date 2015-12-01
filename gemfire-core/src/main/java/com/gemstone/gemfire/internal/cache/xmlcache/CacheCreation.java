@@ -1,9 +1,18 @@
-/*=========================================================================
- * Copyright (c) 2010-2014 Pivotal Software, Inc. All Rights Reserved.
- * This product is protected by U.S. and international copyright
- * and intellectual property laws. Pivotal products are covered by
- * one or more patents listed at http://www.pivotal.io/patents.
- *=========================================================================
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.gemstone.gemfire.internal.cache.xmlcache;
 
@@ -54,7 +63,6 @@ import com.gemstone.gemfire.cache.client.PoolFactory;
 import com.gemstone.gemfire.cache.client.PoolManager;
 import com.gemstone.gemfire.cache.client.internal.PoolImpl;
 import com.gemstone.gemfire.cache.execute.FunctionService;
-import com.gemstone.gemfire.cache.lucene.LuceneService;
 import com.gemstone.gemfire.cache.query.CqAttributes;
 import com.gemstone.gemfire.cache.query.CqException;
 import com.gemstone.gemfire.cache.query.CqExistsException;
@@ -83,7 +91,6 @@ import com.gemstone.gemfire.distributed.DistributedMember;
 import com.gemstone.gemfire.distributed.DistributedSystem;
 import com.gemstone.gemfire.i18n.LogWriterI18n;
 import com.gemstone.gemfire.internal.Assert;
-import com.gemstone.gemfire.cache.hdfs.HDFSStore;
 import com.gemstone.gemfire.cache.hdfs.HDFSStoreFactory;
 import com.gemstone.gemfire.cache.hdfs.internal.HDFSIntegrationUtil;
 import com.gemstone.gemfire.cache.hdfs.internal.HDFSStoreCreation;
@@ -92,6 +99,7 @@ import com.gemstone.gemfire.cache.hdfs.internal.HDFSStoreImpl;
 import com.gemstone.gemfire.internal.cache.CacheServerImpl;
 import com.gemstone.gemfire.internal.cache.CacheConfig;
 import com.gemstone.gemfire.internal.cache.CacheServerLauncher;
+import com.gemstone.gemfire.internal.cache.CacheService;
 import com.gemstone.gemfire.internal.cache.DiskStoreFactoryImpl;
 import com.gemstone.gemfire.internal.cache.DiskStoreImpl;
 import com.gemstone.gemfire.internal.cache.GemFireCacheImpl;
@@ -125,7 +133,7 @@ import com.gemstone.gemfire.pdx.internal.TypeRegistry;
  *
  * @since 3.0
  */
-public class CacheCreation implements InternalCache, Extensible<Cache> {
+public class CacheCreation implements InternalCache {
 
   /** The amount of time to wait for a distributed lock */
   private int lockTimeout = GemFireCacheImpl.DEFAULT_LOCK_TIMEOUT;
@@ -217,6 +225,11 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
    */
   public CacheCreation() {
     this(false);
+  }
+  
+  /** clear thread locals that may have been set by previous uses of CacheCreation */
+  public static void clearThreadLocals() {
+    createInProgress = new ThreadLocal<>();
   }
 
   /**
@@ -349,7 +362,7 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
    * Used from PoolManager to defer to CacheCreation as a manager of pools.
    * @since 5.7
    */
-  private static final ThreadLocal createInProgress = new ThreadLocal();
+  private static ThreadLocal createInProgress = new ThreadLocal();
 
   /**
    * Returns null if the current thread is not doing a CacheCreation create.
@@ -539,11 +552,7 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
       cache.setRegionAttributes(id, attrs);
     }
 
-    Iterator it = this.roots.values().iterator();
-    while (it.hasNext()) {
-      RegionCreation r = (RegionCreation)it.next();
-      r.createRoot(cache);
-    }
+    initializeRegions(this.roots, cache);
 
     cache.readyDynamicRegionFactory();
 
@@ -555,38 +564,76 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
     Integer serverPort = CacheServerLauncher.getServerPort();
     String serverBindAdd = CacheServerLauncher.getServerBindAddress();
     Boolean disableDefaultServer = CacheServerLauncher.disableDefaultServer.get();
+    startCacheServers(this.getCacheServers(), cache, serverPort, serverBindAdd, disableDefaultServer);
+    cache.setBackupFiles(this.backups);
+    cache.addDeclarableProperties(this.declarablePropertiesMap);
+    runInitializer();
+    cache.setInitializer(getInitializer(), getInitializerProps());
     
-    if (this.getCacheServers().size() > 1
+    // UnitTest CacheXml81Test.testCacheExtension
+    // Create all extensions
+    extensionPoint.fireCreate(cache);
+  }
+
+  protected void initializeRegions(Map declarativeRegions, Cache cache) {
+    Iterator it = declarativeRegions.values().iterator();
+    while (it.hasNext()) {
+      RegionCreation r = (RegionCreation)it.next();
+      r.createRoot(cache);
+    }
+  }
+
+  /**
+   * starts declarative cache servers if a server is not running on the port already.
+   * Also adds a default server to the param declarativeCacheServers if a serverPort is specified.
+   */
+  protected void startCacheServers(List declarativeCacheServers, Cache cache, Integer serverPort, String serverBindAdd, Boolean disableDefaultServer) {
+
+    if (declarativeCacheServers.size() > 1
         && (serverPort != null || serverBindAdd != null)) {
       throw new RuntimeException(
           LocalizedStrings.CacheServerLauncher_SERVER_PORT_MORE_THAN_ONE_CACHE_SERVER
               .toLocalizedString());
     }
-    
-    if (this.getCacheServers().isEmpty()
+
+    if (declarativeCacheServers.isEmpty()
         && (serverPort != null || serverBindAdd != null)
         && (disableDefaultServer == null || !disableDefaultServer)) {
       boolean existingCacheServer = false;
-      
+
       List<CacheServer> cacheServers = cache.getCacheServers();
       if (cacheServers != null) {
         for(CacheServer cacheServer : cacheServers) {
-          if (serverPort == cacheServer.getPort() && cacheServer.getBindAddress().equals(serverBindAdd)) {
+          if (serverPort == cacheServer.getPort()) {
             existingCacheServer = true;
           }
         }
       }
       
       if (!existingCacheServer) {
-        this.getCacheServers().add(new CacheServerCreation(cache, false));
+        declarativeCacheServers.add(new CacheServerCreation((GemFireCacheImpl)cache, false));
       }
     }
     
-    for (Iterator iter = this.getCacheServers().iterator(); iter.hasNext();) {
-      CacheServerCreation bridge = (CacheServerCreation)iter.next();
-      
+    for (Iterator iter = declarativeCacheServers.iterator(); iter.hasNext();) {
+      CacheServerCreation declaredCacheServer = (CacheServerCreation)iter.next();
+
+      boolean startServer = true;
+      List<CacheServer> cacheServers = cache.getCacheServers();
+      if (cacheServers != null) {
+        for (CacheServer cacheServer : cacheServers) {
+          if (declaredCacheServer.getPort() == cacheServer.getPort()) {
+            startServer = false;
+          }
+        }
+      }
+
+      if (!startServer) {
+        continue;
+      }
+
       CacheServerImpl impl = (CacheServerImpl)cache.addCacheServer();
-      impl.configureFrom(bridge);
+      impl.configureFrom(declaredCacheServer);
 
       if (serverPort != null && serverPort != CacheServer.DEFAULT_PORT) {
         impl.setPort(serverPort);
@@ -606,14 +653,6 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
                 .toLocalizedString(impl), ex);
       }
     }
-    cache.setBackupFiles(this.backups);
-    cache.addDeclarableProperties(this.declarablePropertiesMap);
-    runInitializer();
-    cache.setInitializer(getInitializer(), getInitializerProps());
-    
-    // UnitTest CacheXml81Test.testCacheExtension
-    // Create all extensions
-    extensionPoint.fireCreate(cache);
   }
 
   /**
@@ -1378,16 +1417,6 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
   }
   
   @Override
-  public HDFSStoreFactory createHDFSStoreFactory() {
-    // TODO Auto-generated method stub
-    return new HDFSStoreFactoryImpl(this);
-  }
-  @Override
-  public HDFSStore findHDFSStore(String storeName) {
-    return (HDFSStore)this.hdfsStores.get(storeName);
-  }
-
-  @Override
   public Collection<HDFSStoreImpl> getHDFSStores() {
     return this.hdfsStores.values();
   }
@@ -1415,11 +1444,6 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
 
   @Override
   public CqService getCqService() {
-    return null;
-  }
-
-  @Override
-  public LuceneService getLuceneService() {
     return null;
   }
 
@@ -1658,6 +1682,9 @@ public class CacheCreation implements InternalCache, Extensible<Cache> {
     }
     
   };
-	  
 
+  @Override
+  public <T extends CacheService> T getService(Class<T> clazz) {
+    throw new UnsupportedOperationException();
+  }
 }

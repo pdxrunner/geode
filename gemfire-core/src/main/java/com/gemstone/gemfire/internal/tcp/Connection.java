@@ -1,9 +1,18 @@
-/*=========================================================================
- * Copyright (c) 2002-2014 Pivotal Software, Inc. All Rights Reserved.
- * This product is protected by U.S. and international copyright
- * and intellectual property laws. Pivotal products are covered by
- * more patents listed at http://www.pivotal.io/patents.
- *=========================================================================
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.gemstone.gemfire.internal.tcp;
 
@@ -58,6 +67,7 @@ import com.gemstone.gemfire.distributed.internal.ReplySender;
 import com.gemstone.gemfire.distributed.internal.direct.DirectChannel;
 import com.gemstone.gemfire.distributed.internal.membership.InternalDistributedMember;
 import com.gemstone.gemfire.distributed.internal.membership.MembershipManager;
+import com.gemstone.gemfire.i18n.StringId;
 import com.gemstone.gemfire.internal.Assert;
 import com.gemstone.gemfire.internal.ByteArrayDataInput;
 import com.gemstone.gemfire.internal.DSFIDFactory;
@@ -75,7 +85,6 @@ import com.gemstone.gemfire.internal.logging.log4j.AlertAppender;
 import com.gemstone.gemfire.internal.logging.log4j.LocalizedMessage;
 import com.gemstone.gemfire.internal.tcp.MsgReader.Header;
 import com.gemstone.gemfire.internal.util.concurrent.ReentrantSemaphore;
-import com.gemstone.org.jgroups.util.StringId;
 
 /** <p>Connection is a socket holder that sends and receives serialized
     message objects.  A Connection may be closed to preserve system
@@ -548,7 +557,7 @@ public class Connection implements Runnable {
   /** creates a connection that we accepted (it was initiated by
    * an explicit connect being done on the other side).
    */
-  private Connection(ConnectionTable t, Socket s)
+  protected Connection(ConnectionTable t, Socket s)
     throws IOException, ConnectionException
   {
     if (t == null) {
@@ -762,6 +771,13 @@ public class Connection implements Runnable {
             String peerName;
             if (this.remoteAddr != null) {
               peerName = this.remoteAddr.toString();
+              // late in the life of jdk 1.7 we started seeing connections accepted
+              // when accept() was not even being called.  This started causing timeouts
+              // to occur in the handshake threads instead of causing failures in
+              // connection-formation.  So, we need to initiate suspect processing here
+              owner.getDM().getMembershipManager().suspectMember(this.remoteAddr,
+                  LocalizedStrings.Connection_CONNECTION_HANDSHAKE_WITH_0_TIMED_OUT_AFTER_WAITING_1_MILLISECONDS.toLocalizedString(
+                      new Object[] {peerName, Integer.valueOf(HANDSHAKE_TIMEOUT_MS)}));
             }
             else {
               peerName = "socket " + this.socket.getRemoteSocketAddress().toString()
@@ -858,24 +874,31 @@ public class Connection implements Runnable {
 
   private static final int CONNECT_HANDSHAKE_SIZE = 4096;
 
-  private void handshakeNio() throws IOException {
-    // We jump through some extra hoops to use a MsgOutputStream
-    // This keeps us from allocating an extra DirectByteBuffer.
+  /**
+   * waits until we've joined the distributed system
+   * before returning
+   */
+  private void waitForAddressCompletion() {
     InternalDistributedMember myAddr = this.owner.getConduit().getLocalAddress();
     synchronized (myAddr) {
-      while (myAddr.getIpAddress() == null) {
+      while ((owner.getConduit().getCancelCriterion().cancelInProgress() == null)
+          && myAddr.getInetAddress() == null && myAddr.getVmViewId() < 0) {
         try {
-          myAddr.wait(); // spurious wakeup ok
+          myAddr.wait(100); // spurious wakeup ok
         }
         catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
           this.owner.getConduit().getCancelCriterion().checkCancelInProgress(ie);
         }
       }
+      Assert.assertTrue(myAddr.getDirectChannelPort() == this.owner.getConduit().getPort());
     }
+  }
 
-    Assert.assertTrue(myAddr.getDirectChannelPort() == this.owner.getConduit().getPort());
-
+  private void handshakeNio() throws IOException {
+    waitForAddressCompletion();
+    
+    InternalDistributedMember myAddr = this.owner.getConduit().getLocalAddress();
     final MsgOutputStream connectHandshake
       = new MsgOutputStream(CONNECT_HANDSHAKE_SIZE);
     //connectHandshake.reset();
@@ -911,6 +934,8 @@ public class Connection implements Runnable {
   }
 
   private void handshakeStream() throws IOException {
+    waitForAddressCompletion();
+
     //this.output = new BufferedOutputStream(getSocket().getOutputStream(), owner.getConduit().bufferSize);
     this.output = getSocket().getOutputStream();
     ByteArrayOutputStream baos = new ByteArrayOutputStream(CONNECT_HANDSHAKE_SIZE);
@@ -1727,6 +1752,7 @@ public class Connection implements Runnable {
       if (logger.isDebugEnabled()) {
         logger.debug("Stopping {} for {}", p2pReaderName(), remoteId);
       }
+      initiateSuspicionIfSharedUnordered();
       if (this.isReceiver) {
         if (!this.sharedResource) {
           this.owner.owner.stats.incThreadOwnedReceivers(-1L, dominoCount.get());
@@ -1920,6 +1946,17 @@ public class Connection implements Runnable {
       }
       if (logger.isDebugEnabled()) {
         logger.debug("{} runNioReader terminated id={} from {}", p2pReaderName(), conduitIdStr, remoteAddr);
+      }
+    }
+  }
+
+  /** initiate suspect processing if a shared/ordered connection is lost and we're not shutting down */
+  private void initiateSuspicionIfSharedUnordered() {
+    if (this.isReceiver && this.handshakeRead && !this.preserveOrder && this.sharedResource) {
+      if (this.owner.getConduit().getCancelCriterion().cancelInProgress() == null) {
+        String reason = "member unexpectedly shut down shared, unordered connection";
+        this.owner.getDM().getMembershipManager().suspectMember(this.getRemoteAddress(),
+            reason);
       }
     }
   }
@@ -2299,7 +2336,7 @@ public class Connection implements Runnable {
                     .toLocalizedString(new Object[]{new Byte(HANDSHAKE_VERSION), new Byte(handShakeByte)}));
               }
               InternalDistributedMember remote = DSFIDFactory.readInternalDistributedMember(dis);
-              Stub stub = new Stub(remote.getIpAddress()/*fix for bug 33615*/, remote.getDirectChannelPort(), remote.getVmViewId());
+              Stub stub = new Stub(remote.getInetAddress()/*fix for bug 33615*/, remote.getDirectChannelPort(), remote.getVmViewId());
               setRemoteAddr(remote, stub);
               Thread.currentThread().setName(LocalizedStrings.Connection_P2P_MESSAGE_READER_FOR_0.toLocalizedString(this.remoteAddr, this.socket.getPort()));
               this.sharedResource = dis.readBoolean();
@@ -2596,6 +2633,16 @@ public class Connection implements Runnable {
       accessed();
     }
     return origSocketInUse;
+  }
+  
+  /**
+   * For testing we want to configure the connection without having
+   * to read a handshake
+   */
+  protected void setSharedUnorderedForTest() {
+    this.preserveOrder = false;
+    this.sharedResource = true;
+    this.handshakeRead = true;
   }
   
 
@@ -3788,7 +3835,7 @@ public class Connection implements Runnable {
                   throw new IllegalStateException(LocalizedStrings.Connection_DETECTED_WRONG_VERSION_OF_GEMFIRE_PRODUCT_DURING_HANDSHAKE_EXPECTED_0_BUT_FOUND_1.toLocalizedString(new Object[] {new Byte(HANDSHAKE_VERSION), new Byte(handShakeByte)}));
                 }
                 InternalDistributedMember remote = DSFIDFactory.readInternalDistributedMember(dis);
-                Stub stub = new Stub(remote.getIpAddress()/*fix for bug 33615*/, remote.getDirectChannelPort(), remote.getVmViewId());
+                Stub stub = new Stub(remote.getInetAddress()/*fix for bug 33615*/, remote.getDirectChannelPort(), remote.getVmViewId());
                 setRemoteAddr(remote, stub);
                 this.sharedResource = dis.readBoolean();
                 this.preserveOrder = dis.readBoolean();

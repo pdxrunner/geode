@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.gemstone.gemfire.internal.offheap;
 
 import static org.junit.Assert.assertEquals;
@@ -15,7 +31,6 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 import com.gemstone.gemfire.OutOfOffHeapMemoryException;
-import com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk;
 import com.gemstone.gemfire.test.junit.categories.UnitTest;
 
 @Category(UnitTest.class)
@@ -30,7 +45,7 @@ public class SimpleMemoryAllocatorJUnitTest {
     int TINY_MULTIPLE = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.TINY_MULTIPLE;
 //    int BIG_MULTIPLE = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.FreeListManager.BIG_MULTIPLE;
     int HUGE_MULTIPLE = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.HUGE_MULTIPLE;
-    int perObjectOverhead = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk.OFF_HEAP_HEADER_SIZE;
+    int perObjectOverhead = com.gemstone.gemfire.internal.offheap.Chunk.OFF_HEAP_HEADER_SIZE;
     int maxTiny = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.MAX_TINY-perObjectOverhead;
 //    int MIN_BIG_SIZE = round(BIG_MULTIPLE, maxTiny+perObjectOverhead+1)-perObjectOverhead;
 //    int maxBig = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.FreeListManager.MAX_BIG-perObjectOverhead;
@@ -151,7 +166,7 @@ public class SimpleMemoryAllocatorJUnitTest {
   
   @Test
   public void testCompaction() {
-    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk.OFF_HEAP_HEADER_SIZE;
+    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.Chunk.OFF_HEAP_HEADER_SIZE;
     final int BIG_ALLOC_SIZE = 150000;
     final int SMALL_ALLOC_SIZE = BIG_ALLOC_SIZE/2;
     final int TOTAL_MEM = BIG_ALLOC_SIZE;
@@ -267,7 +282,7 @@ public class SimpleMemoryAllocatorJUnitTest {
   boolean memoryUsageEventReceived;
   @Test
   public void testUsageEventListener() {
-    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk.OFF_HEAP_HEADER_SIZE;
+    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.Chunk.OFF_HEAP_HEADER_SIZE;
     final int SMALL_ALLOC_SIZE = 1000;
     UnsafeMemoryChunk slab = new UnsafeMemoryChunk(3000);
     try {
@@ -310,7 +325,7 @@ public class SimpleMemoryAllocatorJUnitTest {
   
   @Test
   public void testOutOfOffHeapMemory() {
-    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.SimpleMemoryAllocatorImpl.Chunk.OFF_HEAP_HEADER_SIZE;
+    final int perObjectOverhead = com.gemstone.gemfire.internal.offheap.Chunk.OFF_HEAP_HEADER_SIZE;
     final int BIG_ALLOC_SIZE = 150000;
     final int SMALL_ALLOC_SIZE = BIG_ALLOC_SIZE/2;
     final int TOTAL_MEM = BIG_ALLOC_SIZE;

@@ -1,9 +1,18 @@
-/*=========================================================================
- * Copyright (c) 2002-2014 Pivotal Software, Inc. All Rights Reserved.
- * This product is protected by U.S. and international copyright
- * and intellectual property laws. Pivotal products are covered by
- * more patents listed at http://www.pivotal.io/patents.
- *=========================================================================
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.gemstone.gemfire.internal.tcp;
 
@@ -38,7 +47,7 @@ import com.gemstone.gemfire.distributed.internal.DM;
 import com.gemstone.gemfire.distributed.internal.InternalDistributedSystem;
 import com.gemstone.gemfire.distributed.internal.membership.InternalDistributedMember;
 import com.gemstone.gemfire.distributed.internal.membership.MembershipManager;
-import com.gemstone.gemfire.distributed.internal.membership.jgroup.JGroupMembershipManager;
+import com.gemstone.gemfire.distributed.internal.membership.gms.mgr.GMSMembershipManager;
 import com.gemstone.gemfire.internal.Assert;
 import com.gemstone.gemfire.internal.SocketCloser;
 import com.gemstone.gemfire.internal.SocketCreator;
@@ -681,7 +690,7 @@ public class ConnectionTable  {
     }
   }
 
-  protected final TCPConduit getConduit() {
+  protected TCPConduit getConduit() {
     return owner;
   }
 
@@ -804,7 +813,6 @@ public class ConnectionTable  {
         }
       }
       // now close any sockets being formed
-      SocketCreator sc = SocketCreator.getDefaultInstance();
       synchronized(connectingSockets) {
         for (Iterator it = connectingSockets.entrySet().iterator(); it.hasNext(); ) {
           Map.Entry entry = (Map.Entry)it.next();
@@ -1098,7 +1106,7 @@ public class ConnectionTable  {
    * number of messages
    */
   protected void waitForThreadOwnedOrderedConnectionState(Stub member,
-      HashMap connectionStates) throws InterruptedException {
+      Map connectionStates) throws InterruptedException {
     if (Thread.interrupted()) throw new InterruptedException(); // wisest to do this before the synchronize below
     List r = null;
     synchronized(receivers) {
@@ -1274,7 +1282,7 @@ public class ConnectionTable  {
       InternalDistributedMember targetMember = null;
       if (ackSATimeout > 0) {
         targetMember =
-          ((JGroupMembershipManager)mgr).getMemberForStub(this.id, false);
+          ((GMSMembershipManager)mgr).getMemberForStub(this.id, false);
       }
 
       for (;;) {
@@ -1311,7 +1319,7 @@ public class ConnectionTable  {
             logger.warn(LocalizedMessage.create(
                 LocalizedStrings.ConnectionTable_UNABLE_TO_FORM_A_TCPIP_CONNECTION_TO_0_IN_OVER_1_SECONDS,
                 new Object[] { this.id, (ackTimeout)/1000 }));
-            ((JGroupMembershipManager)mgr).suspectMember(targetMember,
+            ((GMSMembershipManager)mgr).suspectMember(targetMember,
                 "Unable to form a TCP/IP connection in a reasonable amount of time");
             suspected = true;
           }
