@@ -16,12 +16,9 @@
  */
 package com.gemstone.gemfire.distributed;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static com.googlecode.catchexception.apis.BDDCatchException.caughtException;
+import static com.googlecode.catchexception.apis.BDDCatchException.when;
+import static org.assertj.core.api.BDDAssertions.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -59,140 +56,193 @@ public class LocatorLauncherIntegrationJUnitTest {
   public final TestName testName = new TestName();
   
   @Test
-  public void testBuilderParseArguments() throws Exception {
+  public void testBuilderParseArgumentsWithValuesSeparatedWithCommas() throws Exception {
+    // given: a new builder and working directory
     String expectedWorkingDirectory = this.temporaryFolder.getRoot().getCanonicalPath();
     Builder builder = new Builder();
 
-    builder.parseArguments("start", "memberOne", "--bind-address", InetAddress.getLocalHost().getHostAddress(),
-      "--dir", expectedWorkingDirectory, "--hostname-for-clients", "Tucows", "--pid", "1234", "--port", "11235",
-        "--redirect-output", "--force", "--debug");
+    // when: parsing many arguments
+    builder.parseArguments(
+        "start", 
+        "memberOne", 
+        "--bind-address", InetAddress.getLocalHost().getHostAddress(),
+        "--dir", expectedWorkingDirectory, 
+        "--hostname-for-clients", "Tucows", 
+        "--pid", "1234", 
+        "--port", "11235",
+        "--redirect-output", 
+        "--force", 
+        "--debug");
 
-    assertEquals(Command.START, builder.getCommand());
-    assertEquals(InetAddress.getLocalHost(), builder.getBindAddress());
-    assertEquals(expectedWorkingDirectory, builder.getWorkingDirectory());
-    assertEquals("Tucows", builder.getHostnameForClients());
-    assertEquals(1234, builder.getPid().intValue());
-    assertEquals(11235, builder.getPort().intValue());
-    assertTrue(builder.getRedirectOutput());
-    assertTrue(builder.getForce());
-    assertTrue(builder.getDebug());
+    // then: the getters should return properly parsed values
+    assertThat(builder.getCommand()).isEqualTo(Command.START);
+    assertThat(builder.getBindAddress()).isEqualTo(InetAddress.getLocalHost());
+    assertThat(builder.getWorkingDirectory()).isEqualTo(expectedWorkingDirectory);
+    assertThat(builder.getHostnameForClients()).isEqualTo("Tucows");
+    assertThat(builder.getPid().intValue()).isEqualTo(1234);
+    assertThat(builder.getPort().intValue()).isEqualTo(11235);
+    assertThat(builder.getRedirectOutput()).isTrue();
+    assertThat(builder.getForce()).isTrue();
+    assertThat(builder.getDebug()).isTrue();
   }
 
   @Test
-  public void testBuilderParseArgumentsWithCommandInArguments() throws Exception {
+  public void testBuilderParseArgumentsWithValuesSeparatedWithEquals() throws Exception {
+    // given: a new builder and a directory
     String expectedWorkingDirectory = this.temporaryFolder.getRoot().getCanonicalPath();
     Builder builder = new Builder();
 
-    builder.parseArguments("start", "--dir=" + expectedWorkingDirectory, "--port", "12345", "memberOne");
+    // when: parsing arguments with values separated by equals
+    builder.parseArguments(
+        "start", 
+        "--dir=" + expectedWorkingDirectory, 
+        "--port=" + "12345", 
+        "memberOne");
 
-    assertEquals(Command.START, builder.getCommand());
-    assertFalse(Boolean.TRUE.equals(builder.getDebug()));
-    assertFalse(Boolean.TRUE.equals(builder.getForce()));
-    assertFalse(Boolean.TRUE.equals(builder.getHelp()));
-    assertNull(builder.getBindAddress());
-    assertNull(builder.getHostnameForClients());
-    assertEquals("12345", builder.getMemberName());
-    assertNull(builder.getPid());
-    assertEquals(expectedWorkingDirectory, builder.getWorkingDirectory());
-    assertEquals(12345, builder.getPort().intValue());
+    // then: the getters should return properly parsed values
+    assertThat(builder.getCommand()).isEqualTo(Command.START);
+    assertThat(builder.getDebug()).isFalse();
+    assertThat(builder.getForce()).isFalse();
+    assertThat(builder.getHelp()).isFalse();
+    assertThat(builder.getBindAddress()).isNull();
+    assertThat(builder.getHostnameForClients()).isNull();
+    assertThat(builder.getMemberName()).isEqualTo("memberOne");
+    assertThat(builder.getPid()).isNull();
+    assertThat(builder.getWorkingDirectory()).isEqualTo(expectedWorkingDirectory);
+    assertThat(builder.getPort().intValue()).isEqualTo(12345);
   }
 
   @Test
-  public void testBuildWithMemberNameSetInGemfirePropertiesOnStart() throws Exception {
-    File propertiesFile = new File(this.temporaryFolder.getRoot().getCanonicalPath(), "gemfire.properties");
-    System.setProperty(DistributedSystem.PROPERTIES_FILE_PROPERTY, propertiesFile.getCanonicalPath());
-    
+  public void testBuildWithMemberNameSetInGemFirePropertiesOnStart() throws Exception {
+    // given: gemfire.properties with a name
     Properties gemfireProperties = new Properties();
     gemfireProperties.setProperty(DistributionConfig.NAME_NAME, "locator123");
-    gemfireProperties.store(new FileWriter(propertiesFile, false), this.testName.getMethodName());
-    assertTrue(propertiesFile.isFile());
-    assertTrue(propertiesFile.exists());
+    useGemFirePropertiesFileInTemporaryFolder("gemfire.properties", gemfireProperties);
+    
+    // when: starting with null MemberName
+    LocatorLauncher launcher = new Builder()
+        .setCommand(Command.START)
+        .setMemberName(null)
+        .build();
 
-    LocatorLauncher launcher = new Builder().setCommand(Command.START).setMemberName(null).build();
-
-    assertNotNull(launcher);
-    assertEquals(Command.START, launcher.getCommand());
-    assertNull(launcher.getMemberName());
+    // then: name in gemfire.properties file should be used for MemberName
+    assertThat(launcher).isNotNull();
+    assertThat(launcher.getCommand()).isEqualTo(Command.START);
+    assertThat(launcher.getMemberName()).isNull();
   }
 
   @Test
-  public void testSetAndGetWorkingDirectory() throws Exception {
+  public void testBuildWithNoMemberNameOnStart() throws Exception {
+    // given: gemfire.properties with no name
+    useGemFirePropertiesFileInTemporaryFolder("gemfire.properties", new Properties());
+
+    // when: no MemberName is specified
+    when(new Builder()
+        .setCommand(Command.START))
+        .build();
+    
+    // then: throw IllegalStateException
+    then(caughtException())
+        .isExactlyInstanceOf(IllegalStateException.class)
+        .hasMessage(LocalizedStrings.Launcher_Builder_MEMBER_NAME_VALIDATION_ERROR_MESSAGE.toLocalizedString("Locator"));
+  }
+
+  @Test
+  public void testBuilderSetAndGetWorkingDirectory() throws Exception {
+    // given: a new builder and a directory
     String rootFolder = this.temporaryFolder.getRoot().getCanonicalPath();
     Builder builder = new Builder();
 
-    assertEquals(AbstractLauncher.DEFAULT_WORKING_DIRECTORY, builder.getWorkingDirectory());
-    assertSame(builder, builder.setWorkingDirectory(null));
-    assertEquals(AbstractLauncher.DEFAULT_WORKING_DIRECTORY, builder.getWorkingDirectory());
-    assertSame(builder, builder.setWorkingDirectory(""));
-    assertEquals(AbstractLauncher.DEFAULT_WORKING_DIRECTORY, builder.getWorkingDirectory());
-    assertSame(builder, builder.setWorkingDirectory("  "));
-    assertEquals(AbstractLauncher.DEFAULT_WORKING_DIRECTORY, builder.getWorkingDirectory());
-    assertSame(builder, builder.setWorkingDirectory(rootFolder));
-    assertEquals(rootFolder, builder.getWorkingDirectory());
-    assertSame(builder, builder.setWorkingDirectory(null));
-    assertEquals(AbstractLauncher.DEFAULT_WORKING_DIRECTORY, builder.getWorkingDirectory());
+    // when: not setting WorkingDirectory
+    // then: getWorkingDirectory returns default
+    assertThat(builder.getWorkingDirectory()).isEqualTo(AbstractLauncher.DEFAULT_WORKING_DIRECTORY);
+    
+    // when: setting WorkingDirectory to null
+    assertThat(builder.setWorkingDirectory(null)).isSameAs(builder);
+    // then: getWorkingDirectory returns default
+    assertThat(builder.getWorkingDirectory()).isEqualTo(AbstractLauncher.DEFAULT_WORKING_DIRECTORY);
+
+    // when: setting WorkingDirectory to empty string
+    assertThat(builder.setWorkingDirectory("")).isSameAs(builder);
+    // then: getWorkingDirectory returns default
+    assertThat(builder.getWorkingDirectory()).isEqualTo(AbstractLauncher.DEFAULT_WORKING_DIRECTORY);
+
+    // when: setting WorkingDirectory to white space
+    assertThat(builder.setWorkingDirectory("  ")).isSameAs(builder);
+    // then: getWorkingDirectory returns default
+    assertThat(builder.getWorkingDirectory()).isEqualTo(AbstractLauncher.DEFAULT_WORKING_DIRECTORY);
+
+    // when: setting WorkingDirectory to a directory
+    assertThat(builder.setWorkingDirectory(rootFolder)).isSameAs(builder);
+    // then: getWorkingDirectory returns that directory
+    assertThat(builder.getWorkingDirectory()).isEqualTo(rootFolder);
+
+    // when: setting WorkingDirectory to null (again)
+    assertThat(builder.setWorkingDirectory(null)).isSameAs(builder);
+    // then: getWorkingDirectory returns default
+    assertThat(builder.getWorkingDirectory()).isEqualTo(AbstractLauncher.DEFAULT_WORKING_DIRECTORY);
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testSetWorkingDirectoryToFile() throws IOException {
-    File tmpFile = File.createTempFile("tmp", "file");
+  @Test
+  public void testBuilderSetWorkingDirectoryToFile() throws IOException {
+    // given: a file instead of a directory
+    File tmpFile = this.temporaryFolder.newFile();
 
-    assertNotNull(tmpFile);
-    assertTrue(tmpFile.isFile());
+    // when: setting WorkingDirectory to that file
+    when(new Builder())
+        .setWorkingDirectory(tmpFile.getCanonicalPath());
 
-    tmpFile.deleteOnExit();
-
-    try {
-      new Builder().setWorkingDirectory(tmpFile.getCanonicalPath());
-    }
-    catch (IllegalArgumentException expected) {
-      assertEquals(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_NOT_FOUND_ERROR_MESSAGE
-        .toLocalizedString("Locator"), expected.getMessage());
-      assertTrue(expected.getCause() instanceof FileNotFoundException);
-      assertEquals(tmpFile.getCanonicalPath(), expected.getCause().getMessage());
-      throw expected;
-    }
+    // then: throw IllegalArgumentException
+    then(caughtException())
+        .isExactlyInstanceOf(IllegalArgumentException.class)
+        .hasMessage(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_NOT_FOUND_ERROR_MESSAGE.toLocalizedString("Locator"))
+        .hasCause(new FileNotFoundException(tmpFile.getCanonicalPath()));
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testSetWorkingDirectoryToNonExistingDirectory() {
-    try {
-      new Builder().setWorkingDirectory("/path/to/non_existing/directory");
-    }
-    catch (IllegalArgumentException expected) {
-      assertEquals(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_NOT_FOUND_ERROR_MESSAGE
-        .toLocalizedString("Locator"), expected.getMessage());
-      assertTrue(expected.getCause() instanceof FileNotFoundException);
-      assertEquals("/path/to/non_existing/directory", expected.getCause().getMessage());
-      throw expected;
-    }
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testBuildWithNoMemberNameOnStart() throws Exception {
-    System.setProperty("user.dir", this.temporaryFolder.getRoot().getCanonicalPath());
-    try {
-      new Builder().setCommand(Command.START).build();
-    }
-    catch (IllegalStateException expected) {
-      assertEquals(LocalizedStrings.Launcher_Builder_MEMBER_NAME_VALIDATION_ERROR_MESSAGE.toLocalizedString("Locator"),
-        expected.getMessage());
-      throw expected;
-    }
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testBuildWithMismatchingCurrentAndWorkingDirectoryOnStart() throws Exception {
-    try {
-      new Builder().setCommand(Command.START)
+  @Test
+  public void testBuildSetWorkingDirectoryToNonCurrentDirectoryOnStart() throws Exception {
+    // given: using LocatorLauncher in-process
+    
+    // when: setting WorkingDirectory to non-current directory
+    when(new Builder()
+        .setCommand(Command.START)
         .setMemberName("memberOne")
-        .setWorkingDirectory(this.temporaryFolder.getRoot().getCanonicalPath())
+        .setWorkingDirectory(this.temporaryFolder.getRoot().getCanonicalPath()))
         .build();
-    }
-    catch (IllegalStateException expected) {
-      assertEquals(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_OPTION_NOT_VALID_ERROR_MESSAGE
-        .toLocalizedString("Locator"), expected.getMessage());
-      throw expected;
-    }
+    
+    // then: throw IllegalStateException
+    then(caughtException())
+        .isExactlyInstanceOf(IllegalStateException.class)
+        .hasMessage(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_OPTION_NOT_VALID_ERROR_MESSAGE.toLocalizedString("Locator"));
+  }
+  
+  @Test
+  public void testBuilderSetWorkingDirectoryToNonExistingDirectory() {
+    // when: setting WorkingDirectory to non-existing directory
+    when(new Builder())
+        .setWorkingDirectory("/path/to/non_existing/directory");
+    
+    // then: throw IllegalArgumentException
+    then(caughtException())
+        .isExactlyInstanceOf(IllegalArgumentException.class)
+        .hasMessage(LocalizedStrings.Launcher_Builder_WORKING_DIRECTORY_NOT_FOUND_ERROR_MESSAGE.toLocalizedString("Locator"))
+        .hasCause(new FileNotFoundException("/path/to/non_existing/directory"));
+  }
+
+  /**
+   * Creates a gemfire properties file in temporaryFolder:
+   * <ol>
+   * <li>creates <code>fileName</code> in <code>temporaryFolder</code></li>
+   * <li>sets "gemfirePropertyFile" system property</li>
+   * <li>writes <code>gemfireProperties</code> to the file</li>
+   * </ol>
+   */
+  private void useGemFirePropertiesFileInTemporaryFolder(final String fileName, final Properties gemfireProperties) throws Exception {
+    File propertiesFile = new File(this.temporaryFolder.getRoot().getCanonicalPath(), fileName);
+    System.setProperty(DistributedSystem.PROPERTIES_FILE_PROPERTY, propertiesFile.getCanonicalPath());
+    
+    gemfireProperties.store(new FileWriter(propertiesFile, false), this.testName.getMethodName());
+    assertThat(propertiesFile.isFile()).isTrue();
+    assertThat(propertiesFile.exists()).isTrue();
   }
 }
