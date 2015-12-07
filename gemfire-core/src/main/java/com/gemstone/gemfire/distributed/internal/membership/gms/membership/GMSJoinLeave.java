@@ -88,7 +88,7 @@ import com.gemstone.gemfire.security.AuthenticationFailedException;
  */
 public class GMSJoinLeave implements JoinLeave, MessageHandler {
   
-  public static String BYPASS_DISCOVERY = "gemfire.bypass-discovery";
+  public static final String BYPASS_DISCOVERY_PROPERTY = "gemfire.bypass-discovery";
 
   /** amount of time to wait for responses to FindCoordinatorRequests */
   private static final int DISCOVERY_TIMEOUT = Integer.getInteger("gemfire.discovery-timeout", 3000);
@@ -221,7 +221,7 @@ public class GMSJoinLeave implements JoinLeave, MessageHandler {
   public boolean join() {
 
     try {
-      if (Boolean.getBoolean(BYPASS_DISCOVERY)) {
+      if (Boolean.getBoolean(BYPASS_DISCOVERY_PROPERTY)) {
         synchronized(viewInstallationLock) {
           becomeCoordinator();
         }
@@ -1058,6 +1058,14 @@ public class GMSJoinLeave implements JoinLeave, MessageHandler {
       joinResponse.notify();
     }
   }
+  
+  /**
+   * for testing, do not use in any other case as it is not thread safe
+   * @param req
+   */
+  JoinResponseMessage[] getJoinResponseMessage() {
+    return joinResponse;
+  }
 
   private void processFindCoordinatorRequest(FindCoordinatorRequest req) {
     FindCoordinatorResponse resp;
@@ -1476,12 +1484,24 @@ public class GMSJoinLeave implements JoinLeave, MessageHandler {
     return result;
   }
 
+  /***
+   * test method
+   * @return ViewReplyProcessor
+   */
+  protected ViewReplyProcessor getPrepareViewReplyProcessor() {
+    return prepareProcessor;
+  }
+  
+  protected boolean testPrepareProcessorWaiting(){
+    return prepareProcessor.isWaiting();
+  }
+  
   class ViewReplyProcessor {
     volatile int viewId = -1;
     final Set<InternalDistributedMember> notRepliedYet = new HashSet<>();
     NetView conflictingView;
     InternalDistributedMember conflictingViewSender;
-    boolean waiting;
+    volatile boolean waiting;
     final boolean isPrepareViewProcessor;
     final Set<InternalDistributedMember> pendingRemovals = new HashSet<>();
 
@@ -1498,6 +1518,9 @@ public class GMSJoinLeave implements JoinLeave, MessageHandler {
       pendingRemovals.clear();
     }
 
+    boolean isWaiting(){
+      return waiting;
+    }
     synchronized void processPendingRequests(Set<InternalDistributedMember> pendingLeaves, Set<InternalDistributedMember> pendingRemovals) {
       // there's no point in waiting for members who have already
       // requested to leave or who have been declared crashed.
