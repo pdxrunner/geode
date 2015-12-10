@@ -39,6 +39,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.logging.log4j.Logger;
 
+import com.gemstone.gemfire.CancelCriterion;
 import com.gemstone.gemfire.CancelException;
 import com.gemstone.gemfire.ForcedDisconnectException;
 import com.gemstone.gemfire.GemFireConfigException;
@@ -72,6 +73,7 @@ import com.gemstone.gemfire.distributed.internal.membership.MembershipManager;
 import com.gemstone.gemfire.distributed.internal.membership.MembershipTestHook;
 import com.gemstone.gemfire.distributed.internal.membership.NetView;
 import com.gemstone.gemfire.distributed.internal.membership.QuorumChecker;
+import com.gemstone.gemfire.distributed.internal.membership.gms.GMSMember;
 import com.gemstone.gemfire.distributed.internal.membership.gms.GMSUtil;
 import com.gemstone.gemfire.distributed.internal.membership.gms.Services;
 import com.gemstone.gemfire.distributed.internal.membership.gms.SuspectMember;
@@ -1207,8 +1209,8 @@ public class GMSMembershipManager implements MembershipManager, Manager
   }
   
   @Override
-  public void memberSuspected(InternalDistributedMember initiator, InternalDistributedMember suspect) {
-    SuspectMember s = new SuspectMember(initiator, suspect);
+  public void memberSuspected(InternalDistributedMember initiator, InternalDistributedMember suspect, String reason) {
+    SuspectMember s = new SuspectMember(initiator, suspect, reason);
     handleOrDeferSuspect(s);
   }
 
@@ -1228,7 +1230,7 @@ public class GMSMembershipManager implements MembershipManager, Manager
       InternalDistributedMember who = suspectInfo.whoSuspected;
       this.suspectedMembers.put(suspect, Long.valueOf(System.currentTimeMillis()));
       try {
-        listener.memberSuspect(suspect, who);
+        listener.memberSuspect(suspect, who, suspectInfo.reason);
       }
       catch (DistributedSystemDisconnectedException se) {
         // let's not get huffy about it
@@ -1428,7 +1430,6 @@ public class GMSMembershipManager implements MembershipManager, Manager
       latestViewLock.readLock().unlock();
     }
   }
-  
   
   protected boolean isJoining() {
     return this.isJoining;
@@ -1971,6 +1972,7 @@ public class GMSMembershipManager implements MembershipManager, Manager
     boolean sendViaMessenger = isForceUDPCommunications(); // enable when bug #46438 is fixed: || msg.sendViaUDP();
 
     if (useMcast || tcpDisabled || sendViaMessenger) {
+      checkAddressesForUUIDs(destinations);
       result = services.getMessenger().send(msg);
     }
     else {
@@ -1989,6 +1991,23 @@ public class GMSMembershipManager implements MembershipManager, Manager
   @Override
   public void forceUDPMessagingForCurrentThread() {
     forceUseUDPMessaging.set(null);
+  }
+  
+  void checkAddressesForUUIDs(InternalDistributedMember[] addresses) {
+    for (int i=0; i<addresses.length; i++) {
+      InternalDistributedMember m = addresses[i];
+      if(m != null) {
+        GMSMember id = (GMSMember)m.getNetMember();
+        if (!id.hasUUID()) {
+          latestViewLock.readLock().lock();
+          try {
+            addresses[i] = latestView.getCanonicalID(addresses[i]);
+          } finally {
+            latestViewLock.readLock().unlock();
+          }
+        }
+      }
+    }
   }
   
   private boolean isForceUDPCommunications() {
