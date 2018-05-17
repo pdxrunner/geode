@@ -21,6 +21,7 @@ import java.util.Set;
 import org.springframework.shell.core.annotation.CliCommand;
 import org.springframework.shell.core.annotation.CliOption;
 
+import org.apache.geode.cache.configuration.CacheConfig;
 import org.apache.geode.cache.wan.GatewaySender.OrderPolicy;
 import org.apache.geode.distributed.DistributedMember;
 import org.apache.geode.distributed.internal.InternalConfigurationPersistenceService;
@@ -110,6 +111,13 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
       @CliOption(key = CliStrings.CREATE_GATEWAYSENDER__GATEWAYTRANSPORTFILTER,
           help = CliStrings.CREATE_GATEWAYSENDER__GATEWAYTRANSPORTFILTER__HELP) String[] gatewayTransportFilter) {
 
+    CacheConfig.GatewaySender configuration =
+        buildSenderConfiguration(id, remoteDistributedSystemId, parallel, manualStart,
+            socketBufferSize, socketReadTimeout, enableBatchConflation, batchSize,
+            batchTimeInterval, enablePersistence, diskStoreName, diskSynchronous, maxQueueMemory,
+            alertThreshold, dispatcherThreads, orderPolicy == null ? null : orderPolicy.name(),
+            gatewayEventFilters, gatewayTransportFilter);
+
     GatewaySenderFunctionArgs gatewaySenderFunctionArgs =
         new GatewaySenderFunctionArgs(id, remoteDistributedSystemId, parallel, manualStart,
             socketBufferSize, socketReadTimeout, enableBatchConflation, batchSize,
@@ -175,5 +183,33 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
 
       return ResultBuilder.createInfoResult("");
     }
+  }
+
+  private CacheConfig.GatewaySender buildSenderConfiguration(String id, Integer remoteDSId,
+      Boolean parallel, Boolean manualStart, Integer socketBufferSize, Integer socketReadTimeout,
+      Boolean enableBatchConflation, Integer batchSize, Integer batchTimeInterval,
+      Boolean enablePersistence, String diskStoreName, Boolean diskSynchronous,
+      Integer maxQueueMemory, Integer alertThreshold, Integer dispatcherThreads, String orderPolicy,
+      String[] gatewayEventFilters, String[] gatewayTransportFilters) {
+
+    CacheConfig.GatewaySender config = new CacheConfig.GatewaySender();
+    config.setId(id);
+    config.setRemoteDistributedSystemId(String.valueOf(remoteDSId));
+    config.setParallel(parallel);
+    config.setSocketBufferSize(String.valueOf(socketBufferSize));
+    config.setSocketReadTimeout(String.valueOf(socketReadTimeout));
+    config.setEnableBatchConflation(enableBatchConflation);
+    config.setBatchSize(String.valueOf(batchSize));
+    config.setBatchTimeInterval(String.valueOf(batchTimeInterval));
+    config.setEnablePersistence(enablePersistence);
+    config.setDiskStoreName(diskStoreName);
+    config.setDiskSynchronous(diskSynchronous);
+    config.setMaximumQueueMemory(String.valueOf(maxQueueMemory));
+    config.setAlertThreshold(String.valueOf(alertThreshold));
+    config.setDispatcherThreads(String.valueOf(dispatcherThreads));
+    config.setOrderPolicy(orderPolicy);
+    config.setGatewayEventSubstitutionFilter(gatewayEventFilters);
+//    config.set
+    return config;
   }
 }
