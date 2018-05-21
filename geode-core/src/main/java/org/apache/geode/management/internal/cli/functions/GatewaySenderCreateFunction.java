@@ -24,20 +24,18 @@ import org.apache.geode.cache.Cache;
 import org.apache.geode.cache.configuration.CacheConfig;
 import org.apache.geode.cache.configuration.DeclarableType;
 import org.apache.geode.cache.execute.FunctionContext;
-import org.apache.geode.cache.execute.ResultSender;
 import org.apache.geode.cache.wan.GatewayEventFilter;
 import org.apache.geode.cache.wan.GatewaySender;
 import org.apache.geode.cache.wan.GatewaySender.OrderPolicy;
 import org.apache.geode.cache.wan.GatewaySenderFactory;
 import org.apache.geode.cache.wan.GatewayTransportFilter;
 import org.apache.geode.internal.ClassPathLoader;
-import org.apache.geode.internal.cache.xmlcache.CacheXml;
 import org.apache.geode.internal.logging.LogService;
 import org.apache.geode.management.cli.CliFunction;
-import org.apache.geode.management.internal.cli.i18n.CliStrings;
 import org.apache.geode.management.internal.cli.functions.CliFunctionResult.StatusState;
+import org.apache.geode.management.internal.cli.i18n.CliStrings;
 
-public class GatewaySenderCreateFunction extends  CliFunction {
+public class GatewaySenderCreateFunction extends CliFunction {
 
   private static final Logger logger = LogService.getLogger();
 
@@ -50,26 +48,26 @@ public class GatewaySenderCreateFunction extends  CliFunction {
 
   @Override
   public CliFunctionResult executeFunction(FunctionContext context) {
-//    ResultSender<Object> resultSender = context.getResultSender();
+    // ResultSender<Object> resultSender = context.getResultSender();
 
     Cache cache = context.getCache();
     String memberNameOrId = context.getMemberName();
 
-    CacheConfig.GatewaySender config =  (CacheConfig.GatewaySender) context.getArguments();
+    CacheConfig.GatewaySender config = (CacheConfig.GatewaySender) context.getArguments();
 
     Set<GatewaySender> gatewaySenders = cache.getGatewaySenders();
     GatewaySender createdGatewaySender = createGatewaySender(cache, config);
-//    try {
-//      GatewaySender createdGatewaySender = createGatewaySender(cache, config);
-//      XmlEntity xmlEntity =
-//          new XmlEntity(CacheXml.GATEWAY_SENDER, "id", gatewaySenderCreateArgs.getId());
-//      resultSender.lastResult(new CliFunctionResult(memberNameOrId, xmlEntity,
-//          CliStrings.format(CliStrings.CREATE_GATEWAYSENDER__MSG__GATEWAYSENDER_0_CREATED_ON_1,
-//              new Object[] {createdGatewaySender.getId(), memberNameOrId})));
-//    } catch (Exception e) {
-//      logger.error(e.getMessage(), e);
-//      resultSender.lastResult(new CliFunctionResult(memberNameOrId, e, null));
-//    }
+    // try {
+    // GatewaySender createdGatewaySender = createGatewaySender(cache, config);
+    // XmlEntity xmlEntity =
+    // new XmlEntity(CacheXml.GATEWAY_SENDER, "id", gatewaySenderCreateArgs.getId());
+    // resultSender.lastResult(new CliFunctionResult(memberNameOrId, xmlEntity,
+    // CliStrings.format(CliStrings.CREATE_GATEWAYSENDER__MSG__GATEWAYSENDER_0_CREATED_ON_1,
+    // new Object[] {createdGatewaySender.getId(), memberNameOrId})));
+    // } catch (Exception e) {
+    // logger.error(e.getMessage(), e);
+    // resultSender.lastResult(new CliFunctionResult(memberNameOrId, e, null));
+    // }
     return new CliFunctionResult(memberNameOrId, StatusState.OK);
   }
 
@@ -77,8 +75,7 @@ public class GatewaySenderCreateFunction extends  CliFunction {
    * Creates the GatewaySender with given configuration.
    *
    */
-  private GatewaySender createGatewaySender(Cache cache,
-      CacheConfig.GatewaySender config) {
+  private GatewaySender createGatewaySender(Cache cache, CacheConfig.GatewaySender config) {
     GatewaySenderFactory gateway = cache.createGatewaySenderFactory();
 
     Boolean isParallel = config.isParallel();
@@ -152,8 +149,8 @@ public class GatewaySenderCreateFunction extends  CliFunction {
     List<DeclarableType> gatewayEventFilters = config.getGatewayEventFilter();
     if (gatewayEventFilters != null) {
       for (DeclarableType gatewayEventFilter : gatewayEventFilters) {
-        Class gatewayEventFilterKlass =
-            forName(gatewayEventFilter.getClassName(), CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER);
+        Class gatewayEventFilterKlass = forName(gatewayEventFilter.getClassName(),
+            CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER);
         gateway.addGatewayEventFilter((GatewayEventFilter) newInstance(gatewayEventFilterKlass,
             CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER));
       }
@@ -168,8 +165,7 @@ public class GatewaySenderCreateFunction extends  CliFunction {
             gatewayTransportFilterKlass, CliStrings.CREATE_GATEWAYSENDER__GATEWAYTRANSPORTFILTER));
       }
     }
-    return gateway.create(config.getId(),
-        Integer.valueOf(config.getRemoteDistributedSystemId()));
+    return gateway.create(config.getId(), Integer.valueOf(config.getRemoteDistributedSystemId()));
   }
 
   @SuppressWarnings("unchecked")
