@@ -14,9 +14,15 @@
  */
 package org.apache.geode.management.internal.cli.functions;
 
+import java.util.List;
+import java.util.Set;
+
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.Logger;
 
 import org.apache.geode.cache.Cache;
+import org.apache.geode.cache.configuration.CacheConfig;
+import org.apache.geode.cache.configuration.DeclarableType;
 import org.apache.geode.cache.execute.FunctionContext;
 import org.apache.geode.cache.execute.ResultSender;
 import org.apache.geode.cache.wan.GatewayEventFilter;
@@ -25,13 +31,13 @@ import org.apache.geode.cache.wan.GatewaySender.OrderPolicy;
 import org.apache.geode.cache.wan.GatewaySenderFactory;
 import org.apache.geode.cache.wan.GatewayTransportFilter;
 import org.apache.geode.internal.ClassPathLoader;
-import org.apache.geode.internal.cache.execute.InternalFunction;
 import org.apache.geode.internal.cache.xmlcache.CacheXml;
 import org.apache.geode.internal.logging.LogService;
+import org.apache.geode.management.cli.CliFunction;
 import org.apache.geode.management.internal.cli.i18n.CliStrings;
-import org.apache.geode.management.internal.configuration.domain.XmlEntity;
+import org.apache.geode.management.internal.cli.functions.CliFunctionResult.StatusState;
 
-public class GatewaySenderCreateFunction implements InternalFunction {
+public class GatewaySenderCreateFunction extends  CliFunction {
 
   private static final Logger logger = LogService.getLogger();
 
@@ -43,26 +49,28 @@ public class GatewaySenderCreateFunction implements InternalFunction {
 
 
   @Override
-  public void execute(FunctionContext context) {
-    ResultSender<Object> resultSender = context.getResultSender();
+  public CliFunctionResult executeFunction(FunctionContext context) {
+//    ResultSender<Object> resultSender = context.getResultSender();
 
     Cache cache = context.getCache();
     String memberNameOrId = context.getMemberName();
 
-    GatewaySenderFunctionArgs gatewaySenderCreateArgs =
-        (GatewaySenderFunctionArgs) context.getArguments();
+    CacheConfig.GatewaySender config =  (CacheConfig.GatewaySender) context.getArguments();
 
-    try {
-      GatewaySender createdGatewaySender = createGatewaySender(cache, gatewaySenderCreateArgs);
-      XmlEntity xmlEntity =
-          new XmlEntity(CacheXml.GATEWAY_SENDER, "id", gatewaySenderCreateArgs.getId());
-      resultSender.lastResult(new CliFunctionResult(memberNameOrId, xmlEntity,
-          CliStrings.format(CliStrings.CREATE_GATEWAYSENDER__MSG__GATEWAYSENDER_0_CREATED_ON_1,
-              new Object[] {createdGatewaySender.getId(), memberNameOrId})));
-    } catch (Exception e) {
-      logger.error(e.getMessage(), e);
-      resultSender.lastResult(new CliFunctionResult(memberNameOrId, e, null));
-    }
+    Set<GatewaySender> gatewaySenders = cache.getGatewaySenders();
+    GatewaySender createdGatewaySender = createGatewaySender(cache, config);
+//    try {
+//      GatewaySender createdGatewaySender = createGatewaySender(cache, config);
+//      XmlEntity xmlEntity =
+//          new XmlEntity(CacheXml.GATEWAY_SENDER, "id", gatewaySenderCreateArgs.getId());
+//      resultSender.lastResult(new CliFunctionResult(memberNameOrId, xmlEntity,
+//          CliStrings.format(CliStrings.CREATE_GATEWAYSENDER__MSG__GATEWAYSENDER_0_CREATED_ON_1,
+//              new Object[] {createdGatewaySender.getId(), memberNameOrId})));
+//    } catch (Exception e) {
+//      logger.error(e.getMessage(), e);
+//      resultSender.lastResult(new CliFunctionResult(memberNameOrId, e, null));
+//    }
+    return new CliFunctionResult(memberNameOrId, StatusState.OK);
   }
 
   /**
@@ -70,98 +78,98 @@ public class GatewaySenderCreateFunction implements InternalFunction {
    *
    */
   private GatewaySender createGatewaySender(Cache cache,
-      GatewaySenderFunctionArgs gatewaySenderCreateArgs) {
+      CacheConfig.GatewaySender config) {
     GatewaySenderFactory gateway = cache.createGatewaySenderFactory();
 
-    Boolean isParallel = gatewaySenderCreateArgs.isParallel();
+    Boolean isParallel = config.isParallel();
     if (isParallel != null) {
       gateway.setParallel(isParallel);
     }
 
-    Boolean manualStart = gatewaySenderCreateArgs.isManualStart();
+    Boolean manualStart = config.isManualStart();
     if (manualStart != null) {
       gateway.setManualStart(manualStart);
     }
 
-    Integer maxQueueMemory = gatewaySenderCreateArgs.getMaxQueueMemory();
+    Integer maxQueueMemory = Integer.valueOf(config.getMaximumQueueMemory());
     if (maxQueueMemory != null) {
       gateway.setMaximumQueueMemory(maxQueueMemory);
     }
 
-    Integer batchSize = gatewaySenderCreateArgs.getBatchSize();
+    Integer batchSize = Integer.valueOf(config.getBatchSize());
     if (batchSize != null) {
       gateway.setBatchSize(batchSize);
     }
 
-    Integer batchTimeInterval = gatewaySenderCreateArgs.getBatchTimeInterval();
+    Integer batchTimeInterval = Integer.valueOf(config.getBatchTimeInterval());
     if (batchTimeInterval != null) {
       gateway.setBatchTimeInterval(batchTimeInterval);
     }
 
-    Boolean enableBatchConflation = gatewaySenderCreateArgs.isBatchConflationEnabled();
+    Boolean enableBatchConflation = config.isEnableBatchConflation();
     if (enableBatchConflation != null) {
       gateway.setBatchConflationEnabled(enableBatchConflation);
     }
 
-    Integer socketBufferSize = gatewaySenderCreateArgs.getSocketBufferSize();
+    Integer socketBufferSize = Integer.valueOf(config.getSocketBufferSize());
     if (socketBufferSize != null) {
       gateway.setSocketBufferSize(socketBufferSize);
     }
 
-    Integer socketReadTimeout = gatewaySenderCreateArgs.getSocketReadTimeout();
-    if (socketReadTimeout != null) {
-      gateway.setSocketReadTimeout(socketReadTimeout);
+    String socketReadTimeout = config.getSocketReadTimeout();
+    if (StringUtils.isNotEmpty(socketReadTimeout)) {
+      gateway.setSocketReadTimeout(Integer.valueOf(socketReadTimeout));
     }
 
-    Integer alertThreshold = gatewaySenderCreateArgs.getAlertThreshold();
+    Integer alertThreshold = Integer.valueOf(config.getAlertThreshold());
     if (alertThreshold != null) {
       gateway.setAlertThreshold(alertThreshold);
     }
 
-    Integer dispatcherThreads = gatewaySenderCreateArgs.getDispatcherThreads();
+    Integer dispatcherThreads = Integer.valueOf(config.getDispatcherThreads());
     if (dispatcherThreads != null && dispatcherThreads > 1) {
       gateway.setDispatcherThreads(dispatcherThreads);
 
-      String orderPolicy = gatewaySenderCreateArgs.getOrderPolicy();
+      String orderPolicy = config.getOrderPolicy();
       gateway.setOrderPolicy(OrderPolicy.valueOf(orderPolicy));
     }
 
-    Boolean isPersistenceEnabled = gatewaySenderCreateArgs.isPersistenceEnabled();
+    Boolean isPersistenceEnabled = config.isEnablePersistence();
     if (isPersistenceEnabled != null) {
       gateway.setPersistenceEnabled(isPersistenceEnabled);
     }
 
-    String diskStoreName = gatewaySenderCreateArgs.getDiskStoreName();
+    String diskStoreName = config.getDiskStoreName();
     if (diskStoreName != null) {
       gateway.setDiskStoreName(diskStoreName);
     }
 
-    Boolean isDiskSynchronous = gatewaySenderCreateArgs.isDiskSynchronous();
+    Boolean isDiskSynchronous = config.isDiskSynchronous();
     if (isDiskSynchronous != null) {
       gateway.setDiskSynchronous(isDiskSynchronous);
     }
 
-    String[] gatewayEventFilters = gatewaySenderCreateArgs.getGatewayEventFilter();
+    List<DeclarableType> gatewayEventFilters = config.getGatewayEventFilter();
     if (gatewayEventFilters != null) {
-      for (String gatewayEventFilter : gatewayEventFilters) {
+      for (DeclarableType gatewayEventFilter : gatewayEventFilters) {
         Class gatewayEventFilterKlass =
-            forName(gatewayEventFilter, CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER);
+            forName(gatewayEventFilter.getClassName(), CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER);
         gateway.addGatewayEventFilter((GatewayEventFilter) newInstance(gatewayEventFilterKlass,
             CliStrings.CREATE_GATEWAYSENDER__GATEWAYEVENTFILTER));
       }
     }
 
-    String[] gatewayTransportFilters = gatewaySenderCreateArgs.getGatewayTransportFilter();
+    List<DeclarableType> gatewayTransportFilters = config.getGatewayTransportFilter();
     if (gatewayTransportFilters != null) {
-      for (String gatewayTransportFilter : gatewayTransportFilters) {
-        Class gatewayTransportFilterKlass = forName(gatewayTransportFilter,
+      for (DeclarableType gatewayTransportFilter : gatewayTransportFilters) {
+        Class gatewayTransportFilterKlass = forName(gatewayTransportFilter.getClassName(),
             CliStrings.CREATE_GATEWAYSENDER__GATEWAYTRANSPORTFILTER);
         gateway.addGatewayTransportFilter((GatewayTransportFilter) newInstance(
             gatewayTransportFilterKlass, CliStrings.CREATE_GATEWAYSENDER__GATEWAYTRANSPORTFILTER));
       }
     }
-    return gateway.create(gatewaySenderCreateArgs.getId(),
-        gatewaySenderCreateArgs.getRemoteDistributedSystemId());
+    return gateway.create(config.getId(),
+        Integer.valueOf(config.getRemoteDistributedSystemId()));
   }
 
   @SuppressWarnings("unchecked")

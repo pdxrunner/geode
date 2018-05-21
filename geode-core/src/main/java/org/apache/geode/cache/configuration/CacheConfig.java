@@ -2802,7 +2802,7 @@ public class CacheConfig {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlType(name = "", propOrder = {"gatewayEventFilter", "gatewayEventSubstitutionFilter",
       "gatewayTransportFilter"})
-  public static class GatewaySender {
+  public static class GatewaySender implements Serializable {
 
     @XmlElement(name = "gateway-event-filter", namespace = "http://geode.apache.org/schema/cache")
     protected List<DeclarableType> gatewayEventFilter;

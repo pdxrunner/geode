@@ -15,13 +15,16 @@
 
 package org.apache.geode.management.internal.cli.commands;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.shell.core.annotation.CliCommand;
 import org.springframework.shell.core.annotation.CliOption;
 
 import org.apache.geode.cache.configuration.CacheConfig;
+import org.apache.geode.cache.configuration.DeclarableType;
 import org.apache.geode.cache.wan.GatewaySender.OrderPolicy;
 import org.apache.geode.distributed.DistributedMember;
 import org.apache.geode.distributed.internal.InternalConfigurationPersistenceService;
@@ -30,6 +33,7 @@ import org.apache.geode.internal.Version;
 import org.apache.geode.management.cli.CliMetaData;
 import org.apache.geode.management.cli.ConverterHint;
 import org.apache.geode.management.cli.Result;
+import org.apache.geode.management.cli.SingleGfshCommand;
 import org.apache.geode.management.internal.cli.AbstractCliAroundInterceptor;
 import org.apache.geode.management.internal.cli.GfshParseResult;
 import org.apache.geode.management.internal.cli.functions.CliFunctionResult;
@@ -38,17 +42,18 @@ import org.apache.geode.management.internal.cli.functions.GatewaySenderFunctionA
 import org.apache.geode.management.internal.cli.i18n.CliStrings;
 import org.apache.geode.management.internal.cli.result.CommandResult;
 import org.apache.geode.management.internal.cli.result.ResultBuilder;
+import org.apache.geode.management.internal.cli.result.model.ResultModel;
 import org.apache.geode.management.internal.configuration.domain.XmlEntity;
 import org.apache.geode.management.internal.security.ResourceOperation;
 import org.apache.geode.security.ResourcePermission;
 
-public class CreateGatewaySenderCommand extends InternalGfshCommand {
+public class CreateGatewaySenderCommand extends SingleGfshCommand {
   @CliCommand(value = CliStrings.CREATE_GATEWAYSENDER, help = CliStrings.CREATE_GATEWAYSENDER__HELP)
   @CliMetaData(relatedTopic = CliStrings.TOPIC_GEODE_WAN,
       interceptor = "org.apache.geode.management.internal.cli.commands.CreateGatewaySenderCommand$Interceptor")
   @ResourceOperation(resource = ResourcePermission.Resource.CLUSTER,
       operation = ResourcePermission.Operation.MANAGE, target = ResourcePermission.Target.GATEWAY)
-  public Result createGatewaySender(@CliOption(key = {CliStrings.GROUP, CliStrings.GROUPS},
+  public ResultModel createGatewaySender(@CliOption(key = {CliStrings.GROUP, CliStrings.GROUPS},
       optionContext = ConverterHint.MEMBERGROUP,
       help = CliStrings.CREATE_GATEWAYSENDER__GROUP__HELP) String[] onGroups,
 
@@ -118,42 +123,21 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
             alertThreshold, dispatcherThreads, orderPolicy == null ? null : orderPolicy.name(),
             gatewayEventFilters, gatewayTransportFilter);
 
-    GatewaySenderFunctionArgs gatewaySenderFunctionArgs =
-        new GatewaySenderFunctionArgs(id, remoteDistributedSystemId, parallel, manualStart,
-            socketBufferSize, socketReadTimeout, enableBatchConflation, batchSize,
-            batchTimeInterval, enablePersistence, diskStoreName, diskSynchronous, maxQueueMemory,
-            alertThreshold, dispatcherThreads, orderPolicy == null ? null : orderPolicy.name(),
-            gatewayEventFilters, gatewayTransportFilter);
-
     Set<DistributedMember> membersToCreateGatewaySenderOn = getMembers(onGroups, onMember);
 
     // Don't allow sender to be created if all members are not the current version.
     if (!verifyAllCurrentVersion(membersToCreateGatewaySenderOn)) {
-      return ResultBuilder.createUserErrorResult(
+      return ResultModel.createError(
           CliStrings.CREATE_GATEWAYSENDER__MSG__CAN_NOT_CREATE_DIFFERENT_VERSIONS);
     }
 
     List<CliFunctionResult> gatewaySenderCreateResults =
-        executeAndGetFunctionResult(GatewaySenderCreateFunction.INSTANCE, gatewaySenderFunctionArgs,
+        executeAndGetFunctionResult(GatewaySenderCreateFunction.INSTANCE, configuration,
             membersToCreateGatewaySenderOn);
 
-    CommandResult result = ResultBuilder.buildResult(gatewaySenderCreateResults);
-    XmlEntity xmlEntity = findXmlEntity(gatewaySenderCreateResults);
+    ResultModel result = ResultModel.createMemberStatusResult(gatewaySenderCreateResults, false);
+    result.setConfigObject(configuration);
 
-    // no xml needs to be updated, simply return
-    if (xmlEntity == null) {
-      return result;
-    }
-
-    // has xml but unable to persist to cluster config, need to print warning message and return
-    if (onMember != null || getConfigurationPersistenceService() == null) {
-      result.setCommandPersisted(false);
-      return result;
-    }
-
-    // update cluster config
-    ((InternalConfigurationPersistenceService) getConfigurationPersistenceService())
-        .addXmlEntity(xmlEntity, onGroups);
     return result;
   }
 
@@ -162,9 +146,15 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
         member -> ((InternalDistributedMember) member).getVersionObject().equals(Version.CURRENT));
   }
 
+  @Override
+  public void updateClusterConfig(String group, CacheConfig config, Object configObject) {
+    config.getGatewaySender().add((CacheConfig.GatewaySender) configObject);
+
+  }
+
   public static class Interceptor extends AbstractCliAroundInterceptor {
     @Override
-    public Result preExecution(GfshParseResult parseResult) {
+    public ResultModel preExecution(GfshParseResult parseResult) {
       Integer dispatcherThreads =
           (Integer) parseResult.getParamValue(CliStrings.CREATE_GATEWAYSENDER__DISPATCHERTHREADS);
       OrderPolicy orderPolicy =
@@ -172,16 +162,16 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
       Boolean parallel =
           (Boolean) parseResult.getParamValue(CliStrings.CREATE_GATEWAYSENDER__PARALLEL);
       if (dispatcherThreads != null && dispatcherThreads > 1 && orderPolicy == null) {
-        return ResultBuilder.createUserErrorResult(
+        return ResultModel.createError(
             "Must specify --order-policy when --dispatcher-threads is larger than 1.");
       }
 
       if (parallel && orderPolicy == OrderPolicy.THREAD) {
-        return ResultBuilder.createUserErrorResult(
+        return ResultModel.createError(
             "Parallel Gateway Sender can not be created with THREAD OrderPolicy");
       }
 
-      return ResultBuilder.createInfoResult("");
+      return ResultModel.createInfo("");
     }
   }
 
@@ -208,8 +198,14 @@ public class CreateGatewaySenderCommand extends InternalGfshCommand {
     config.setAlertThreshold(String.valueOf(alertThreshold));
     config.setDispatcherThreads(String.valueOf(dispatcherThreads));
     config.setOrderPolicy(orderPolicy);
-    config.setGatewayEventSubstitutionFilter(gatewayEventFilters);
-//    config.set
+    if (gatewayEventFilters != null) {
+      config.getGatewayEventFilter().addAll(Arrays.stream(gatewayEventFilters)
+          .map(classname -> new DeclarableType((classname))).collect(Collectors.toList()));
+    }
+    if (gatewayTransportFilters != null) {
+      config.getGatewayTransportFilter().addAll(Arrays.stream(gatewayTransportFilters)
+          .map(classname -> new DeclarableType((classname))).collect(Collectors.toList()));
+    }
     return config;
   }
 }
