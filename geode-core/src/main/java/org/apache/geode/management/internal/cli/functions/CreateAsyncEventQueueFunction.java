@@ -39,7 +39,7 @@ import org.apache.geode.internal.ClassPathLoader;
 import org.apache.geode.internal.InternalDataSerializer;
 import org.apache.geode.internal.cache.InternalCache;
 import org.apache.geode.internal.logging.LogService;
-import org.apache.geode.management.AbstractFunctionResult.StatusState;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.cli.CliFunction;
 import org.apache.geode.management.cli.CliFunctionResult;
 
@@ -129,9 +129,9 @@ public class CreateAsyncEventQueueFunction extends CliFunction {
 
       asyncEventQueueFactory.create(config.getId(), (AsyncEventListener) listenerInstance);
 
-      return new CliFunctionResult(memberId, StatusState.OK, "Success");
+      return new CliFunctionResult(memberId, FunctionResultStatusState.OK, "Success");
     } catch (CacheClosedException cce) {
-      return new CliFunctionResult(memberId, StatusState.ERROR, null);
+      return new CliFunctionResult(memberId, FunctionResultStatusState.ERROR, null);
     } catch (Exception e) {
       logger.error("Could not create async event queue: {}", e.getMessage(), e);
       return new CliFunctionResult(memberId, e, null);

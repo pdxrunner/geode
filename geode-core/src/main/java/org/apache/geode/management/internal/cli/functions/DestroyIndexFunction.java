@@ -23,6 +23,7 @@ import org.apache.geode.cache.configuration.RegionConfig;
 import org.apache.geode.cache.execute.FunctionContext;
 import org.apache.geode.cache.query.Index;
 import org.apache.geode.cache.query.QueryService;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.cli.CliFunction;
 import org.apache.geode.management.cli.CliFunctionResult;
 import org.apache.geode.management.internal.cli.i18n.CliStrings;
@@ -49,36 +50,36 @@ public class DestroyIndexFunction extends CliFunction {
         if (region != null) {
           if (indexName == null || indexName.isEmpty()) {
             queryService.removeIndexes(region);
-            result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.OK,
+            result = new CliFunctionResult(memberId, FunctionResultStatusState.OK,
                 "Destroyed all indexes on region " + regionPath);
           } else {
             Index index = queryService.getIndex(region, indexName);
 
             if (index != null) {
               queryService.removeIndex(index);
-              result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.OK,
+              result = new CliFunctionResult(memberId, FunctionResultStatusState.OK,
                   "Destroyed index " + indexName + " on region " + regionPath);
             } else {
-              result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.IGNORABLE,
+              result = new CliFunctionResult(memberId, FunctionResultStatusState.IGNORABLE,
                   CliStrings.format(CliStrings.DESTROY_INDEX__INDEX__NOT__FOUND, indexName));
             }
           }
         } else {
-          result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.ERROR,
+          result = new CliFunctionResult(memberId, FunctionResultStatusState.ERROR,
               CliStrings.format(CliStrings.DESTROY_INDEX__REGION__NOT__FOUND, regionPath));
         }
       } else {
         if (indexName == null || indexName.isEmpty()) {
           queryService.removeIndexes();
-          result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.OK,
+          result = new CliFunctionResult(memberId, FunctionResultStatusState.OK,
               "Destroyed all indexes");
         } else {
           boolean indexRemoved = removeIndexByName(indexName, queryService);
           if (indexRemoved) {
-            result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.OK,
+            result = new CliFunctionResult(memberId, FunctionResultStatusState.OK,
                 "Destroyed index " + indexName);
           } else {
-            result = new CliFunctionResult(memberId, CliFunctionResult.StatusState.IGNORABLE,
+            result = new CliFunctionResult(memberId, FunctionResultStatusState.IGNORABLE,
                 CliStrings.format(CliStrings.DESTROY_INDEX__INDEX__NOT__FOUND, indexName));
           }
         }

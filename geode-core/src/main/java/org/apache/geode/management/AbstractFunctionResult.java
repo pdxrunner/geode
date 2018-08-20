@@ -33,7 +33,7 @@ public class AbstractFunctionResult
   protected Serializable[] serializables = new String[0];
   protected Object resultObject;
   protected byte[] byteData = new byte[0];
-  protected AbstractFunctionResult.StatusState state;
+  protected FunctionResultStatusState state;
 
   @Override
   public String getMemberIdOrName() {
@@ -117,18 +117,19 @@ public class AbstractFunctionResult
   @Override
   public void fromData(DataInput in) throws IOException, ClassNotFoundException {
     this.memberIdOrName = DataSerializer.readString(in);
-    this.state = DataSerializer.readPrimitiveBoolean(in) ? StatusState.OK : StatusState.ERROR;
+    this.state = DataSerializer.readPrimitiveBoolean(in) ? FunctionResultStatusState.OK
+        : FunctionResultStatusState.ERROR;
     // this.xmlEntity = DataSerializer.readObject(in);
     this.serializables = (Serializable[]) DataSerializer.readObjectArray(in);
     this.resultObject = DataSerializer.readObject(in);
     this.byteData = DataSerializer.readByteArray(in);
     // fromDataPre_GEODE_1_6_0_0(in);
-    this.state = DataSerializer.readEnum(StatusState.class, in);
+    this.state = DataSerializer.readEnum(FunctionResultStatusState.class, in);
   }
 
   @Override
   public boolean isSuccessful() {
-    return this.state == StatusState.OK;
+    return this.state == FunctionResultStatusState.OK;
   }
 
   @Override
@@ -187,9 +188,5 @@ public class AbstractFunctionResult
   @Override
   public Version[] getSerializationVersions() {
     return new Version[] {Version.GFE_80};
-  }
-
-  public enum StatusState {
-    OK, ERROR, IGNORABLE
   }
 }

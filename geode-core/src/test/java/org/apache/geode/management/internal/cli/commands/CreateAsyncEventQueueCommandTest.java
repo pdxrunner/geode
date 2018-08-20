@@ -46,7 +46,7 @@ import org.junit.Test;
 
 import org.apache.geode.cache.execute.Function;
 import org.apache.geode.distributed.internal.InternalConfigurationPersistenceService;
-import org.apache.geode.management.AbstractFunctionResult.StatusState;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.cli.CliFunctionResult;
 import org.apache.geode.management.internal.cli.GfshParseResult;
 import org.apache.geode.management.internal.cli.remote.CommandExecutor;
@@ -122,8 +122,8 @@ public class CreateAsyncEventQueueCommandTest {
   @Test
   public void buildResult_all_success() {
     List<CliFunctionResult> functionResults = new ArrayList<>();
-    functionResults.add(new CliFunctionResult("member1", StatusState.OK, "SUCCESS"));
-    functionResults.add(new CliFunctionResult("member2", StatusState.OK, "SUCCESS"));
+    functionResults.add(new CliFunctionResult("member1", FunctionResultStatusState.OK, "SUCCESS"));
+    functionResults.add(new CliFunctionResult("member2", FunctionResultStatusState.OK, "SUCCESS"));
 
     // this is only to make the code pass that member check
     doReturn(Collections.emptySet()).when(command).getMembers(any(), any());
@@ -142,7 +142,8 @@ public class CreateAsyncEventQueueCommandTest {
   @Test
   public void buildResult_all_failure() {
     List<CliFunctionResult> functionResults = new ArrayList<>();
-    functionResults.add(new CliFunctionResult("member1", StatusState.ERROR, "failed"));
+    functionResults
+        .add(new CliFunctionResult("member1", FunctionResultStatusState.ERROR, "failed"));
     functionResults
         .add(new CliFunctionResult("member2", new RuntimeException("exception happened"), null));
 
@@ -162,7 +163,7 @@ public class CreateAsyncEventQueueCommandTest {
   @Test
   public void buildResult_one_failure_one_success() {
     List<CliFunctionResult> functionResults = new ArrayList<>();
-    functionResults.add(new CliFunctionResult("member1", StatusState.OK, "SUCCESS"));
+    functionResults.add(new CliFunctionResult("member1", FunctionResultStatusState.OK, "SUCCESS"));
     functionResults
         .add(new CliFunctionResult("member2", new RuntimeException("exception happened"), null));
 
@@ -186,7 +187,7 @@ public class CreateAsyncEventQueueCommandTest {
     doReturn(Collections.emptySet()).when(command).getMembers(any(), any());
 
     List<CliFunctionResult> functionResults = new ArrayList<>();
-    functionResults.add(new CliFunctionResult("member1", StatusState.OK, "SUCCESS"));
+    functionResults.add(new CliFunctionResult("member1", FunctionResultStatusState.OK, "SUCCESS"));
     doReturn(functionResults).when(command).executeAndGetFunctionResult(isA(Function.class),
         isA(Object.class), isA(Set.class));
 

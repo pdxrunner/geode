@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.geode.DataSerializer;
 import org.apache.geode.management.AbstractFunctionResult;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.internal.configuration.domain.XmlEntity;
 
 public class CliFunctionResult extends AbstractFunctionResult {
@@ -55,21 +56,21 @@ public class CliFunctionResult extends AbstractFunctionResult {
   @Deprecated
   public CliFunctionResult(final String memberIdOrName) {
     this.memberIdOrName = memberIdOrName;
-    this.state = StatusState.OK;
+    this.state = FunctionResultStatusState.OK;
   }
 
   @Deprecated
   public CliFunctionResult(final String memberIdOrName, final Serializable[] serializables) {
     this.memberIdOrName = memberIdOrName;
     this.serializables = serializables;
-    this.state = StatusState.OK;
+    this.state = FunctionResultStatusState.OK;
   }
 
   @Deprecated
   public CliFunctionResult(final String memberIdOrName, final XmlEntity xmlEntity) {
     this.memberIdOrName = memberIdOrName;
     this.xmlEntity = xmlEntity;
-    this.state = StatusState.OK;
+    this.state = FunctionResultStatusState.OK;
   }
 
   @Deprecated
@@ -78,7 +79,7 @@ public class CliFunctionResult extends AbstractFunctionResult {
     this.memberIdOrName = memberIdOrName;
     this.xmlEntity = xmlEntity;
     this.serializables = serializables;
-    this.state = StatusState.OK;
+    this.state = FunctionResultStatusState.OK;
   }
 
   @Deprecated
@@ -88,19 +89,20 @@ public class CliFunctionResult extends AbstractFunctionResult {
     if (message != null) {
       this.serializables = new String[] {message};
     }
-    this.state = StatusState.OK;
+    this.state = FunctionResultStatusState.OK;
   }
 
   /**
-   * @deprecated Use {@code CliFunctionResult(String, StatusState, String)} instead
+   * @deprecated Use {@code CliFunctionResult(String, FunctionResultStatusState, String)} instead
    */
   @Deprecated
   public CliFunctionResult(final String memberIdOrName, final boolean successful,
       final String message) {
-    this(memberIdOrName, successful ? StatusState.OK : StatusState.ERROR, message);
+    this(memberIdOrName,
+        successful ? FunctionResultStatusState.OK : FunctionResultStatusState.ERROR, message);
   }
 
-  public CliFunctionResult(final String memberIdOrName, final StatusState state,
+  public CliFunctionResult(final String memberIdOrName, final FunctionResultStatusState state,
       final String message) {
     this.memberIdOrName = memberIdOrName;
     this.state = state;
@@ -117,9 +119,9 @@ public class CliFunctionResult extends AbstractFunctionResult {
       this.serializables = new String[] {message};
     }
     if (resultObject instanceof Throwable) {
-      this.state = StatusState.ERROR;
+      this.state = FunctionResultStatusState.ERROR;
     } else {
-      this.state = StatusState.OK;
+      this.state = FunctionResultStatusState.OK;
     }
   }
 
@@ -128,7 +130,7 @@ public class CliFunctionResult extends AbstractFunctionResult {
   }
 
   public String getStatus(boolean skipIgnore) {
-    if (state == StatusState.IGNORABLE) {
+    if (state == FunctionResultStatusState.IGNORABLE) {
       return skipIgnore ? "IGNORED" : "ERROR";
     }
 
@@ -184,12 +186,13 @@ public class CliFunctionResult extends AbstractFunctionResult {
   @Override
   public void fromData(DataInput in) throws IOException, ClassNotFoundException {
     fromDataPre_GEODE_1_6_0_0(in);
-    this.state = DataSerializer.readEnum(StatusState.class, in);
+    this.state = DataSerializer.readEnum(FunctionResultStatusState.class, in);
   }
 
   public void fromDataPre_GEODE_1_6_0_0(DataInput in) throws IOException, ClassNotFoundException {
     this.memberIdOrName = DataSerializer.readString(in);
-    this.state = DataSerializer.readPrimitiveBoolean(in) ? StatusState.OK : StatusState.ERROR;
+    this.state = DataSerializer.readPrimitiveBoolean(in) ? FunctionResultStatusState.OK
+        : FunctionResultStatusState.ERROR;
     this.xmlEntity = DataSerializer.readObject(in);
     this.serializables = (Serializable[]) DataSerializer.readObjectArray(in);
     this.resultObject = DataSerializer.readObject(in);
@@ -203,7 +206,7 @@ public class CliFunctionResult extends AbstractFunctionResult {
   }
 
   public boolean isIgnorableFailure() {
-    return this.state == StatusState.IGNORABLE;
+    return this.state == FunctionResultStatusState.IGNORABLE;
   }
 
   @Deprecated

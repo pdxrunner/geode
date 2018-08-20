@@ -33,6 +33,7 @@ import org.apache.geode.distributed.DistributedMember;
 import org.apache.geode.distributed.internal.InternalConfigurationPersistenceService;
 import org.apache.geode.distributed.internal.membership.InternalDistributedMember;
 import org.apache.geode.internal.cache.InternalCache;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.cli.CliFunctionResult;
 import org.apache.geode.management.internal.cli.exceptions.UserErrorException;
 import org.apache.geode.management.internal.cli.i18n.CliStrings;
@@ -71,7 +72,7 @@ public class DestroyGatewayReceiverCommandTest {
 
   @Test
   public void memberNoGroup_isOK() {
-    result1 = new CliFunctionResult("member1", CliFunctionResult.StatusState.OK, "result1");
+    result1 = new CliFunctionResult("member1", FunctionResultStatusState.OK, "result1");
     functionResults.add(result1);
     Set<DistributedMember> membersSet = new HashSet<>();
     membersSet.add(new InternalDistributedMember("member1", 0));
@@ -84,7 +85,7 @@ public class DestroyGatewayReceiverCommandTest {
 
   @Test
   public void groupNoMember_isOK() {
-    result1 = new CliFunctionResult("member1", CliFunctionResult.StatusState.OK, "result1");
+    result1 = new CliFunctionResult("member1", FunctionResultStatusState.OK, "result1");
     functionResults.add(result1);
     Set<DistributedMember> membersSet = new HashSet<>();
     membersSet.add(new InternalDistributedMember("member1", 0));

@@ -24,7 +24,7 @@ import org.apache.geode.cache.execute.FunctionContext;
 import org.apache.geode.cache.execute.ResultSender;
 import org.apache.geode.cache.wan.GatewayReceiver;
 import org.apache.geode.internal.logging.LogService;
-import org.apache.geode.management.AbstractFunctionResult.StatusState;
+import org.apache.geode.management.FunctionResultStatusState;
 import org.apache.geode.management.cli.CliFunction;
 import org.apache.geode.management.cli.CliFunctionResult;
 import org.apache.geode.management.internal.cli.CliUtil;
@@ -51,7 +51,7 @@ public class DestroyGatewayReceiverFunction extends CliFunction {
             receiver.stop();
           }
           receiver.destroy();
-          return new CliFunctionResult(memberNameOrId, StatusState.OK,
+          return new CliFunctionResult(memberNameOrId, FunctionResultStatusState.OK,
               String.format("GatewayReceiver destroyed on \"%s\"", memberNameOrId));
         } catch (Exception e) {
           logger.error(e.getMessage(), e);
@@ -59,7 +59,7 @@ public class DestroyGatewayReceiverFunction extends CliFunction {
         }
       }
     }
-    return new CliFunctionResult(memberNameOrId, StatusState.IGNORABLE,
+    return new CliFunctionResult(memberNameOrId, FunctionResultStatusState.IGNORABLE,
         "Gateway receiver not found.");
   }
 

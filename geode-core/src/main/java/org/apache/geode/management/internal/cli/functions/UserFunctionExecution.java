@@ -14,7 +14,7 @@
  */
 package org.apache.geode.management.internal.cli.functions;
 
-import static org.apache.geode.management.AbstractFunctionResult.StatusState.ERROR;
+import static org.apache.geode.management.FunctionResultStatusState.ERROR;
 
 import java.util.ArrayList;
 import java.util.Arrays;
