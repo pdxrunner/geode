@@ -3,6 +3,17 @@
 ```bash
 ./deploy_meta.sh <github account name>
 ```
+In the browser, go to `https://concourse.apachegeode-ci.info/teams/staging/pipelines`, 
+and select the meta pipleine `meta-<github account name>-<branch name>`
+
+
+1) Meta pipeline will build its base docker image first, `build-meta-mini-docker-image`.
+2) When complete start `set-images-pipeline`. When complete refresh browser to see new images pipeline.
+3) Start `fork-branch-images-pipeline` and wait for all images to complete. (30m)
+4) Back on the `meta-<...>` pipeline, start `set-pipeline` and wait for main pipeline to deploy. Refresh your browser.
+
+
+
 
 # Generating Pipeline Templates Manually
 To generate a pipeline, using jinja:
