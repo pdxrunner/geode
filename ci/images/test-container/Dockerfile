@@ -23,6 +23,7 @@ WORKDIR /tmp/work
 ADD ./initdocker /usr/local/bin/initdocker
 
 RUN  apt-get update \
+  && chmod +x /usr/local/bin/initdocker \
   && apt-get install -y --no-install-recommends \
      apt-transport-https \
      lsb-release \
