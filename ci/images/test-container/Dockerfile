@@ -20,10 +20,7 @@ ARG CHROME_DRIVER_VERSION=2.35
 
 WORKDIR /tmp/work
 
-ADD ./initdocker /usr/local/bin/initdocker
-
 RUN  apt-get update \
-  && chmod +x /usr/local/bin/initdocker \
   && apt-get install -y --no-install-recommends \
      apt-transport-https \
      lsb-release \
@@ -36,6 +33,7 @@ RUN  apt-get update \
     aptitude \
     ca-certificates \
     google-chrome-stable \
+    cgroupfs-mount \
     docker-ce \
     docker-compose \
   && wget --no-verbose -O /tmp/chromedriver_linux64.zip https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip \
@@ -49,3 +47,5 @@ RUN  apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/work
+
+CMD service docker start

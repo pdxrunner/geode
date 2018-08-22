@@ -106,7 +106,7 @@ def dockerConfig = {
       workdir.mkdirs()
       cmd.withWorkingDir(workdir.toString())
 
-      //println cmd
+      cmd.withPrivileged(true)
     }
   }
 }
