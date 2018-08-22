@@ -1,5 +1,12 @@
 # Deploying Pipelines
 
+Log into the pipeline, and if necessary, update fly. (fly will warn you if you need to do the
+`fly sync`)
+```bash
+fly login -c https://concourse.apachegeode-ci.info -t geode -n staging
+fly -t geode sync
+```
+Now deploy the pipeline for your fork
 ```bash
 ./deploy_meta.sh <github account name>
 ```
