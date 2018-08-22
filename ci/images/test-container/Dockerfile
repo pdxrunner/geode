@@ -24,9 +24,10 @@ RUN  apt-get update \
      apt-transport-https \
      lsb-release \
   && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+  && echo "deb http://packages.cloud.google.com/apt cloud-sdk-$(lsb_release -c -s) main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+  && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
   && apt-get update \
-  && apt-get purge lxc-docker \
   && apt-get install -y --no-install-recommends \
     aptitude \
     ca-certificates \
