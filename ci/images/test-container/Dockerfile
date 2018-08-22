@@ -19,6 +19,9 @@ ENTRYPOINT []
 ARG CHROME_DRIVER_VERSION=2.35
 
 WORKDIR /tmp/work
+
+ADD ./initdocker /usr/local/bin/initdocker
+
 RUN  apt-get update \
   && apt-get install -y --no-install-recommends \
      apt-transport-https \
