@@ -160,6 +160,8 @@ jobs:
   - aggregate:
     - get: openjdk8-docker-image
       trigger: true
+      params:
+        skip_download: true
     - get: apachegeode-build-concourse-dockerfile
       trigger: true
   - put: apachegeode-build-concourse-docker-image
@@ -175,9 +177,13 @@ jobs:
     - get: test-container-docker-image
       passed: [build-test-container-dind-docker-image]
       trigger: true
+      params:
+        skip_download: true
     - get: test-container-dind-docker-image
       passed: [build-test-container-dind-docker-image]
       trigger: true
+      params:
+        skip_download: true
     - get: google-geode-builder
       trigger: true
     - get: alpine-tools-docker-image
@@ -203,6 +209,8 @@ jobs:
   - aggregate:
     - get: alpine37-docker-image
       trigger: true
+      params:
+        skip_download: true
     - get: alpine-tools-dockerfile
       trigger: true
   - put: alpine-tools-docker-image
@@ -218,7 +226,7 @@ jobs:
     - get: openjdk8-docker-image
       trigger: true
       params:
-        save: true
+        skip_download: true
     - get: test-container-dockerfile
       trigger: true
   - put: test-container-docker-image
@@ -235,6 +243,8 @@ jobs:
     - get: test-container-docker-image
       trigger: true
       passed: [build-test-container-docker-image]
+      params:
+        skip_download: true
     - get: test-container-dind-dockerfile
       trigger: true
   - put: test-container-dind-docker-image
@@ -251,6 +261,8 @@ jobs:
   - aggregate:
     - get: alpine-docker-image
       trigger: true
+      params:
+        skip_download: true
     - get: concourse-metadata-resource-dockerfile
       trigger: true
   - put: concourse-metadata-resource-docker-image
@@ -265,6 +277,8 @@ jobs:
   - aggregate:
     - get: alpine-docker-image
       trigger: true
+      params:
+        skip_download: true
     - get: metric-tools-dockerfile
       trigger: true
   - put: metric-tools-docker-image
@@ -279,6 +293,8 @@ jobs:
   - aggregate:
     - get: alpine-docker-image
       trigger: true
+      params:
+        skip_download: true
     - get: gce-instances-resource-dockerfile
       trigger: true
   - put: gce-instances-resource-docker-image

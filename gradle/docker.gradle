@@ -71,8 +71,6 @@ def dockerConfig = {
       def pathIdx = -1
       def tmpEnv = []
 
-      cmd.withEnv(['TMP=/tmp'])
-
       cmd.getEnv().each { tmpEnv << it }
 
       tmpEnv.eachWithIndex { x, j ->
