@@ -175,6 +175,9 @@ jobs:
     - get: test-container-docker-image
       passed: [build-test-container-docker-image]
       trigger: true
+    - get: test-container-dind-docker-image
+      passed: [build-test-container-dind-docker-image]
+      trigger: true
     - get: google-geode-builder
       trigger: true
     - get: alpine-tools-docker-image
