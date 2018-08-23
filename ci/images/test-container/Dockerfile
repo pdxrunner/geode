@@ -15,6 +15,7 @@
 # limitations under the License.
 
 FROM openjdk:8
+ENTRYPOINT []
 
 ARG CHROME_DRIVER_VERSION=2.35
 
@@ -25,17 +26,12 @@ RUN  apt-get update \
      apt-transport-https \
      lsb-release \
   && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-  && echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-  && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
   && apt-get update \
   && apt-get install -y --no-install-recommends \
     aptitude \
     ca-certificates \
     google-chrome-stable \
-    cgroupfs-mount \
-    docker-ce \
-    docker-compose \
   && wget --no-verbose -O /tmp/chromedriver_linux64.zip https://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip \
   && rm -rf /opt/selenium/chromedriver \
   && unzip /tmp/chromedriver_linux64.zip -d /opt/selenium \
@@ -47,7 +43,3 @@ RUN  apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/work
-
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

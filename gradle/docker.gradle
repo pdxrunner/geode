@@ -60,6 +60,9 @@ def dockerConfig = {
     // Add volumes configured by top-level build script
     volumes << project.dunitDockerVolumes
 
+    def tmpDir = System.getProperty('java.io.tmpdir')
+    volumes << [tmpDir:tmpDir]
+
     // specify the user for starting Gradle test worker within the container.
     user = dunitDockerUser
 
@@ -67,6 +70,9 @@ def dockerConfig = {
       def javaHomeIdx = -1
       def pathIdx = -1
       def tmpEnv = []
+
+      cmd.withEnv(['TMP=/tmp'])
+
       cmd.getEnv().each { tmpEnv << it }
 
       tmpEnv.eachWithIndex { x, j ->
