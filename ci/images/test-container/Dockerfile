@@ -13,8 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 FROM openjdk:8
-ENTRYPOINT []
 
 ARG CHROME_DRIVER_VERSION=2.35
 
@@ -48,4 +48,6 @@ RUN  apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/work
 
-CMD service docker start
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
