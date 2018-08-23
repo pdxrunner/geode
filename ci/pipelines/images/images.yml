@@ -231,6 +231,7 @@ jobs:
   - aggregate:
     - get: test-container-docker-image
       trigger: true
+      passed: [build-test-container-docker-image]
     - get: test-container-dind-dockerfile
       trigger: true
   - put: test-container-dind-docker-image
