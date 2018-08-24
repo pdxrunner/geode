@@ -188,6 +188,7 @@ jobs:
           ARTIFACT_SLUG: {{test.ARTIFACT_SLUG}}
           CALL_STACK_TIMEOUT: {{test.CALL_STACK_TIMEOUT}}
           DUNIT_PARALLEL_FORKS: {{test.DUNIT_PARALLEL_FORKS}}
+          DUNIT_DOCKER_IMAGE: gcr.io/apachegeode-ci/{{ pipeline_prefix() }}{{test.DUNIT_DOCKER_IMAGE}}
           GRADLE_TASK: {{test.GRADLE_TASK}}
           GRADLE_TASK_OPTIONS: ""
           MAINTENANCE_VERSION: {{repository.branch}}

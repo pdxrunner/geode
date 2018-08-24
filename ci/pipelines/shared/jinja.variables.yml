@@ -31,6 +31,7 @@ tests:
   ARTIFACT_SLUG: acceptancetestfiles
   CALL_STACK_TIMEOUT: "1800"
   DUNIT_PARALLEL_FORKS: "7"
+  DUNIT_DOCKER_IMAGE: "test-container-dind"
   GRADLE_TASK: acceptanceTest
   execute_test_timeout: 45m
   PARALLEL_DUNIT: "true"
@@ -40,6 +41,7 @@ tests:
   ARTIFACT_SLUG: distributedtestfiles
   CALL_STACK_TIMEOUT: "7200"
   DUNIT_PARALLEL_FORKS: "24"
+  DUNIT_DOCKER_IMAGE: "test-container"
   GRADLE_TASK: distributedTest
   execute_test_timeout: 2h15m
   PARALLEL_DUNIT: "true"
@@ -49,6 +51,7 @@ tests:
   ARTIFACT_SLUG: integrationtestfiles
   CALL_STACK_TIMEOUT: "1500"
   DUNIT_PARALLEL_FORKS: "48"
+  DUNIT_DOCKER_IMAGE: "test-container"
   GRADLE_TASK: integrationTest
   execute_test_timeout: 40m
   PARALLEL_DUNIT: "true"
@@ -58,6 +61,7 @@ tests:
   ARTIFACT_SLUG: upgradetestfiles
   CALL_STACK_TIMEOUT: "3000"
   DUNIT_PARALLEL_FORKS: "48"
+  DUNIT_DOCKER_IMAGE: "test-container"
   GRADLE_TASK: upgradeTest
   execute_test_timeout: 1h
   PARALLEL_DUNIT: "true"
@@ -67,6 +71,7 @@ tests:
   ARTIFACT_SLUG: stressnewtestfiles
   CALL_STACK_TIMEOUT: "7200"
   DUNIT_PARALLEL_FORKS: "24"
+  DUNIT_DOCKER_IMAGE: "test-container"
   GRADLE_TASK: repeatTest
   execute_test_timeout: 2h15m
   PARALLEL_DUNIT: "true"

@@ -58,6 +58,9 @@ if [[ -n "${PARALLEL_DUNIT}" && "${PARALLEL_DUNIT}" == "true" ]]; then
   if [ -n "${DUNIT_PARALLEL_FORKS}" ]; then
     DUNIT_PARALLEL_FORKS="-PdunitParallelForks=${DUNIT_PARALLEL_FORKS}"
   fi
+  if [ -n "${DUNIT_DOCKER_IMAGE}" ]; then
+    DUNIT_DOCKER_IMAGE="-PdunitDockerImage=${DUNIT_DOCKER_IMAGE}"
+  fi
 else
   PARALLEL_DUNIT=""
   DUNIT_PARALLEL_FORKS=""
@@ -71,7 +74,7 @@ fi
 GRADLE_COMMAND="./gradlew \
     ${PARALLEL_DUNIT} \
     ${DUNIT_PARALLEL_FORKS} \
-    -PdunitDockerImage=\$(docker images --format '{{.Repository}}:{{.Tag}}') \
+    ${DUNIT_DOCKER_IMAGE} \
     ${DEFAULT_GRADLE_TASK_OPTIONS} \
     ${GRADLE_TASK} \
     ${GRADLE_TASK_OPTIONS}"
