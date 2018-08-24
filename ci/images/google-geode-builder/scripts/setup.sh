@@ -67,9 +67,12 @@ gcloud config set metrics/environment github_docker_image
 gcloud components install docker-credential-gcr --quiet
 gcloud auth configure-docker --quiet
 
+(
+IFS=":"
 for i in ${GEODE_DOCKER_IMAGE}; do
   docker pull ${i}
 done
+)
 
 curl -Lo /usr/local/bin/dunit-progress https://github.com/jdeppe-pivotal/progress-util/releases/download/0.2/progress.linux
 chmod +x /usr/local/bin/dunit-progress
