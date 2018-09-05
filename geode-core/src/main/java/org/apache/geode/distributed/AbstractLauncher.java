@@ -31,6 +31,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -852,6 +853,126 @@ public abstract class AbstractLauncher<T extends Comparable<T>> implements Runna
     @Override
     public String toString() {
       return getDescription();
+    }
+  }
+
+  public enum Command {
+    START("start", "bind-address", "hostname-for-clients", "port", "force", "debug", "help"),
+    STATUS("status", "bind-address", "port", "member", "pid", "dir", "debug", "help"),
+    STOP("stop", "member", "pid", "dir", "debug", "help"),
+    VERSION("version"),
+    UNSPECIFIED("unspecified");
+
+    private List<String> options;
+
+    private final String name;
+
+    Command(final String name, final String... options) {
+      assert isNotBlank(name) : "The name of the locator launcher command must be specified!";
+      this.name = name;
+      this.options = (options != null ? Collections.unmodifiableList(Arrays.asList(options))
+          : Collections.emptyList());
+    }
+
+    /**
+     * STATUS options differ between LocatorLauncher and ServerLauncher
+     */
+    public void setOptions(String... options) {
+      this.options = options != null ? Collections.unmodifiableList(Arrays.asList(options))
+          : Collections.emptyList();
+    }
+
+    /**
+     * Determines whether the specified name refers to a valid Locator launcher command, as defined
+     * by this enumerated type.
+     *
+     * @param name a String value indicating the potential name of a Locator launcher command.
+     * @return a boolean indicating whether the specified name for a Locator launcher command is
+     *         valid.
+     */
+    public static boolean isCommand(final String name) {
+      return (valueOfName(name) != null);
+    }
+
+    /**
+     * Determines whether the given Locator launcher command has been properly specified. The
+     * command is deemed unspecified if the reference is null or the Command is UNSPECIFIED.
+     *
+     * @param command the Locator launcher command.
+     * @return a boolean value indicating whether the Locator launcher command is unspecified.
+     * @see AbstractLauncher.Command#UNSPECIFIED
+     */
+    public static boolean isUnspecified(final AbstractLauncher.Command command) {
+      return (command == null || command.isUnspecified());
+    }
+
+    /**
+     * Looks up a Locator launcher command by name. The equality comparison on name is
+     * case-insensitive.
+     *
+     * @param name a String value indicating the name of the Locator launcher command.
+     * @return an enumerated type representing the command name or null if the no such command with
+     *         the specified name exists.
+     */
+    public static AbstractLauncher.Command valueOfName(final String name) {
+      for (AbstractLauncher.Command command : values()) {
+        if (command.getName().equalsIgnoreCase(name)) {
+          return command;
+        }
+      }
+
+      return null;
+    }
+
+    /**
+     * Gets the name of the Locator launcher command.
+     *
+     * @return a String value indicating the name of the Locator launcher command.
+     */
+    public String getName() {
+      return this.name;
+    }
+
+    /**
+     * Gets a set of valid options that can be used with the Locator launcher command when used from
+     * the command-line.
+     *
+     * @return a Set of Strings indicating the names of the options available to the Locator
+     *         launcher command.
+     */
+    public List<String> getOptions() {
+      return this.options;
+    }
+
+    /**
+     * Determines whether this Locator launcher command has the specified command-line option.
+     *
+     * @param option a String indicating the name of the command-line option to this command.
+     * @return a boolean value indicating whether this command has the specified named command-line
+     *         option.
+     */
+    public boolean hasOption(final String option) {
+      return getOptions().contains(lowerCase(option));
+    }
+
+    /**
+     * Convenience method for determining whether this is the UNSPECIFIED Locator launcher command.
+     *
+     * @return a boolean indicating if this command is UNSPECIFIED.
+     * @see #UNSPECIFIED
+     */
+    public boolean isUnspecified() {
+      return UNSPECIFIED == this;
+    }
+
+    /**
+     * Gets the String representation of this Locator launcher command.
+     *
+     * @return a String value representing this Locator launcher command.
+     */
+    @Override
+    public String toString() {
+      return getName();
     }
   }
 
