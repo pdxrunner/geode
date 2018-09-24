@@ -15,7 +15,7 @@
 
 package org.apache.geode.management.internal.cli.commands;
 
-import static org.assertj.core.api.Java6Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -90,6 +90,9 @@ public class StartMemberUtilsTest {
   @Test
   public void testGeodeOnClasspathIsFirst() {
     String currentClasspath = System.getProperty("java.class.path");
+    System.out.println(
+        "testGeodeOnClasspathIsFirst(): initial condition: System.getProperty(\"java.class.path\") = "
+            + currentClasspath);
     String customGeodeCore = FileSystems
         .getDefault().getPath("/custom/geode-core-" + GemFireVersion.getGemFireVersion() + ".jar")
         .toAbsolutePath().toString();
