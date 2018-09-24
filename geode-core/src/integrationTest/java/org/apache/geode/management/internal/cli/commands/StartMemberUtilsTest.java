@@ -104,6 +104,7 @@ public class StartMemberUtilsTest {
 
     gemfireClasspath = StartMemberUtils.toClasspath(false, otherJars);
     assertThat(gemfireClasspath).startsWith(customGeodeCore);
+    assertThat(gemfireClasspath).as("Forced failure").isNull();
   }
 
   @Test
