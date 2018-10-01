@@ -857,8 +857,8 @@ public abstract class AbstractLauncher<T extends Comparable<T>> implements Runna
   }
 
   public enum Command {
-    START("start", "bind-address", "hostname-for-clients", "port", "force", "debug", "help"),
-    STATUS("status", "bind-address", "port", "member", "pid", "dir", "debug", "help"),
+    START("start", ""),
+    STATUS("status", ""),
     STOP("stop", "member", "pid", "dir", "debug", "help"),
     VERSION("version"),
     UNSPECIFIED("unspecified");
@@ -873,6 +873,9 @@ public abstract class AbstractLauncher<T extends Comparable<T>> implements Runna
       this.options = (options != null ? Collections.unmodifiableList(Arrays.asList(options))
           : Collections.emptyList());
     }
+
+    public static void START(String start, String s, String s1, String port, String force,
+        String debug, String help) {}
 
     /**
      * STATUS options differ between LocatorLauncher and ServerLauncher
