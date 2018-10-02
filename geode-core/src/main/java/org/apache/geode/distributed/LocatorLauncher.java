@@ -235,6 +235,8 @@ public class LocatorLauncher extends AbstractLauncher<String> {
    * @see org.apache.geode.distributed.LocatorLauncher.Builder
    */
   private LocatorLauncher(final Builder builder) {
+    commandOptions.put(START, startOptions);
+    commandOptions.put(STATUS, statusOptions);
     this.command = builder.getCommand();
     this.help = Boolean.TRUE.equals(builder.getHelp());
     this.bindAddressSpecified = builder.isBindAddressSpecified();

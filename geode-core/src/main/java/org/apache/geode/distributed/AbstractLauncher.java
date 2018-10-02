@@ -34,6 +34,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +75,10 @@ public abstract class AbstractLauncher<T extends Comparable<T>> implements Runna
   @Deprecated
   protected static final long READ_PID_FILE_TIMEOUT_MILLIS = 2 * 1000;
 
+  protected static final EnumMap<Command, String[]> commandOptions = new EnumMap<>(Command.class);
+
+
+
   public static final String DEFAULT_WORKING_DIRECTORY = CURRENT_DIRECTORY;
 
   public static final String SIGNAL_HANDLER_REGISTRATION_SYSTEM_PROPERTY =
@@ -91,6 +96,12 @@ public abstract class AbstractLauncher<T extends Comparable<T>> implements Runna
   protected Logger logger = Logger.getLogger(getClass().getName());
 
   public AbstractLauncher() {
+    commandOptions.put(Command.START, new String[] {""});
+    commandOptions.put(Command.STATUS, new String[] {""});
+    commandOptions.put(Command.STOP,
+        new String[] {"stop", "member", "pid", "dir", "debug", "help"});
+    commandOptions.put(Command.VERSION, new String[] {"version"});
+    commandOptions.put(Command.UNSPECIFIED, new String[] {"unspecified"});
     try {
       if (Boolean.getBoolean(SIGNAL_HANDLER_REGISTRATION_SYSTEM_PROPERTY)) {
         forName(SUN_SIGNAL_API_CLASS_NAME, new SunAPINotFoundException(
