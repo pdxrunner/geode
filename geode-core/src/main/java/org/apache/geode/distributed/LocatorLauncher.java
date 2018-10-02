@@ -93,6 +93,11 @@ public class LocatorLauncher extends AbstractLauncher<String> {
 
   private static final Boolean DEFAULT_LOAD_SHARED_CONFIG_FROM_DIR = Boolean.FALSE;
 
+  private static final String[] startOptions =
+      new String[] {"bind-address", "hostname-for-clients", "port", "force", "debug", "help"};
+  private static final String[] statusOptions =
+      new String[] {"bind-address", "port", "member", "pid", "dir", "debug", "help"};
+
   private static final Map<String, String> helpMap = new HashMap<>();
 
   static {
