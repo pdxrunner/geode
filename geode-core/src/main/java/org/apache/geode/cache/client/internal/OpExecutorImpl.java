@@ -800,6 +800,7 @@ public class OpExecutorImpl implements ExecutablePool {
 
   private StringBuffer getExceptionMessage(String exceptionName, int retryCount,
       boolean finalAttempt, Connection connection, Throwable ex) {
+    new Throwable("DEBUG: getExceptionMessage: ").printStackTrace();
     StringBuffer message = new StringBuffer(200);
     message.append("Pool unexpected ").append(exceptionName);
     if (connection != null) {
