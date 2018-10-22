@@ -29,7 +29,6 @@ import org.apache.geode.distributed.DistributedMember;
 import org.apache.geode.management.cli.CliFunctionResult;
 import org.apache.geode.management.cli.CliMetaData;
 import org.apache.geode.management.cli.ConverterHint;
-import org.apache.geode.management.cli.result.FileResultModel;
 import org.apache.geode.management.cli.result.InfoResultModel;
 import org.apache.geode.management.cli.result.ResultModel;
 import org.apache.geode.management.internal.cli.AbstractCliAroundInterceptor;
@@ -37,7 +36,6 @@ import org.apache.geode.management.internal.cli.CliUtil;
 import org.apache.geode.management.internal.cli.GfshParseResult;
 import org.apache.geode.management.internal.cli.functions.ExportConfigFunction;
 import org.apache.geode.management.internal.cli.i18n.CliStrings;
-import org.apache.geode.management.internal.cli.result.ResultData;
 import org.apache.geode.management.internal.security.ResourceOperation;
 import org.apache.geode.security.ResourcePermission;
 
@@ -88,10 +86,8 @@ public class ExportConfigCommand extends InternalGfshCommand {
         String cacheFileName = result.getMemberIdOrName() + "-cache.xml";
         String propsFileName = result.getMemberIdOrName() + "-gf.properties";
         String[] fileContent = (String[]) result.getSerializables();
-        crm.addFile(cacheFileName, fileContent[0].getBytes(), ResultData.FILE_TYPE_TEXT,
-            "Downloading Cache XML file: ");
-        crm.addFile(propsFileName, fileContent[1].getBytes(), ResultData.FILE_TYPE_TEXT,
-            "Downloading properties file: ");
+        crm.addFile(cacheFileName, fileContent[0]);
+        crm.addFile(propsFileName, fileContent[1]);
       }
     }
 
@@ -102,17 +98,17 @@ public class ExportConfigCommand extends InternalGfshCommand {
    * Interceptor used by gfsh to intercept execution of export config command at "shell".
    */
   public static class Interceptor extends AbstractCliAroundInterceptor {
-    private String saveDirString;
+    private File saveDirFile;
 
     @Override
     public ResultModel preExecution(GfshParseResult parseResult) {
       String dir = parseResult.getParamValueAsString("dir");
       if (StringUtils.isBlank(dir)) {
-        saveDirString = new File(".").getAbsolutePath();
+        saveDirFile = new File(".").getAbsoluteFile();
         return new ResultModel();
       }
 
-      File saveDirFile = new File(dir.trim());
+      saveDirFile = new File(dir.trim()).getAbsoluteFile();
 
       if (!saveDirFile.exists() && !saveDirFile.mkdirs()) {
         return ResultModel
@@ -133,17 +129,13 @@ public class ExportConfigCommand extends InternalGfshCommand {
         return ResultModel.createError(
             CliStrings.format(CliStrings.EXPORT_CONFIG__MSG__NOT_WRITEABLE, saveDirFile.getName()));
       }
-
-      saveDirString = saveDirFile.getAbsolutePath();
       return new ResultModel();
     }
 
     @Override
     public ResultModel postExecution(GfshParseResult parseResult, ResultModel commandResult,
         Path tempFile) throws Exception {
-      for (FileResultModel file : commandResult.getFiles().values()) {
-        file.writeFile(saveDirString);
-      }
+      commandResult.saveFileTo(saveDirFile);
       return commandResult;
     }
   }

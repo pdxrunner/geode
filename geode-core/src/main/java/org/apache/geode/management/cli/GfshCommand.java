@@ -82,8 +82,14 @@ public abstract class GfshCommand implements CommandMarker {
     return locator == null ? null : locator.getConfigurationPersistenceService();
   }
 
+
   public void setCache(Cache cache) {
     this.cache = (InternalCache) cache;
+  }
+
+  public boolean isSharedConfigurationRunning() {
+    InternalLocator locator = InternalLocator.getLocator();
+    return locator != null && locator.isSharedConfigurationRunning();
   }
 
   public Subject getSubject() {
@@ -139,7 +145,7 @@ public abstract class GfshCommand implements CommandMarker {
    * if no members matches these names, an empty set would return, this does not include locators
    */
   public Set<DistributedMember> findMembers(String[] groups, String[] members) {
-    return CliUtil.findMembers(groups, members, (InternalCache) getCache());
+    return CliUtil.findMembers(groups, members, cache);
   }
 
   /**

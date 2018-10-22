@@ -37,14 +37,13 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
+import org.apache.geode.cache.InternalCache;
 import org.apache.geode.cache.Region;
 import org.apache.geode.cache.configuration.CacheConfig;
 import org.apache.geode.cache.configuration.JndiBindingsType;
 import org.apache.geode.distributed.DistributedMember;
 import org.apache.geode.distributed.internal.InternalConfigurationPersistenceService;
-import org.apache.geode.internal.cache.InternalCache;
-import org.apache.geode.management.cli.CliFunctionResult;
-import org.apache.geode.management.internal.cli.functions.CreateJndiBindingFunction;
+import org.apache.geode.management.internal.cli.functions.CliFunctionResult;
 import org.apache.geode.management.internal.cli.functions.DestroyJndiBindingFunction;
 import org.apache.geode.management.internal.configuration.domain.Configuration;
 import org.apache.geode.test.junit.rules.GfshParserRule;
@@ -198,8 +197,8 @@ public class DestroyJndiBindingCommandTest {
     assertThat(cacheConfig.getJndiBindings().isEmpty()).isTrue();
     verify(command).updateClusterConfig(eq("cluster"), eq(cacheConfig), any());
 
-    ArgumentCaptor<CreateJndiBindingFunction> function =
-        ArgumentCaptor.forClass(CreateJndiBindingFunction.class);
+    ArgumentCaptor<DestroyJndiBindingFunction> function =
+        ArgumentCaptor.forClass(DestroyJndiBindingFunction.class);
     ArgumentCaptor<String> jndiName = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Set<DistributedMember>> targetMembers = ArgumentCaptor.forClass(Set.class);
     verify(command, times(1)).executeAndGetFunctionResult(function.capture(), jndiName.capture(),

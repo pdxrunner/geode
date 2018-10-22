@@ -26,7 +26,7 @@ import static org.apache.geode.distributed.ConfigurationProperties.MCAST_PORT;
 import static org.apache.geode.distributed.ConfigurationProperties.NAME;
 import static org.apache.geode.distributed.ConfigurationProperties.SECURITY_MANAGER;
 import static org.apache.geode.management.internal.ManagementConstants.OBJECTNAME__CLIENTSERVICE_MXBEAN;
-import static org.awaitility.Awaitility.await;
+import static org.apache.geode.test.awaitility.GeodeAwaitility.await;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.junit.Assert.assertThat;
@@ -55,7 +55,7 @@ import org.junit.rules.TemporaryFolder;
 import org.apache.geode.distributed.DistributedSystem;
 import org.apache.geode.distributed.internal.InternalDistributedSystem;
 import org.apache.geode.distributed.internal.membership.gms.MembershipManagerHelper;
-import org.apache.geode.internal.AvailablePortHelper;
+import org.apache.geode.internal.UniquePortSupplier;
 import org.apache.geode.internal.cache.InternalCache;
 import org.apache.geode.internal.cache.tier.sockets.CacheClientNotifier;
 import org.apache.geode.internal.cache.tier.sockets.CacheClientProxy;
@@ -68,6 +68,7 @@ import org.apache.geode.management.internal.MBeanJMXAdapter;
 import org.apache.geode.management.internal.SystemManagementService;
 import org.apache.geode.management.internal.cli.CliUtil;
 import org.apache.geode.security.SecurityManager;
+import org.apache.geode.test.awaitility.GeodeAwaitility;
 import org.apache.geode.test.junit.rules.serializable.SerializableExternalResource;
 
 /**
@@ -89,6 +90,7 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
   protected Properties properties = new Properties();
 
   protected boolean autoStart = false;
+  private final transient UniquePortSupplier portSupplier;
 
   public static void setWaitUntilTimeout(int waitUntilTimeout) {
     WAIT_UNTIL_TIMEOUT = waitUntilTimeout;
@@ -97,6 +99,11 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
   private static int WAIT_UNTIL_TIMEOUT = 30;
 
   public MemberStarterRule() {
+    this(new UniquePortSupplier());
+  }
+
+  public MemberStarterRule(UniquePortSupplier portSupplier) {
+    this.portSupplier = portSupplier;
     oldUserDir = System.getProperty("user.dir");
 
     // initial values
@@ -123,10 +130,10 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
     // invoke stop() first and then ds.disconnect
     stopMember();
 
+    disconnectDSIfAny();
     // this will clean up the SocketCreators created in this VM so that it won't contaminate
     // future tests
     SocketCreatorFactory.close();
-    disconnectDSIfAny();
 
     if (temporaryFolder != null) {
       temporaryFolder.delete();
@@ -231,7 +238,7 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
     if (!useProductDefaultPorts) {
       // do no override these properties if already exists
       properties.putIfAbsent(JMX_MANAGER_PORT,
-          AvailablePortHelper.getRandomAvailableTCPPort() + "");
+          portSupplier.getAvailablePort() + "");
       this.jmxPort = Integer.parseInt(properties.getProperty(JMX_MANAGER_PORT));
     } else {
       // the real port numbers will be set after we started the server/locator.
@@ -245,8 +252,9 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
   public T withHttpService(boolean useDefaultPort) {
     properties.setProperty(HTTP_SERVICE_BIND_ADDRESS, "localhost");
     if (!useDefaultPort) {
-      httpPort = AvailablePortHelper.getRandomAvailableTCPPort();
-      properties.put(HTTP_SERVICE_PORT, httpPort + "");
+      properties.putIfAbsent(HTTP_SERVICE_PORT,
+          portSupplier.getAvailablePort() + "");
+      this.httpPort = Integer.parseInt(properties.getProperty(HTTP_SERVICE_PORT));
     } else {
       // indicate start http service but with default port
       // (different from Gemfire properties, 0 means do not start http service)
@@ -344,7 +352,7 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
   public void waitTillClientsAreReadyOnServer(String serverName, int serverPort, int clientCount) {
     waitTillCacheServerIsReady(serverName, serverPort);
     CacheServerMXBean bean = getCacheServerMXBean(serverName, serverPort);
-    await().atMost(1, TimeUnit.MINUTES).until(() -> bean.getClientIds().length == clientCount);
+    await().until(() -> bean.getClientIds().length == clientCount);
   }
 
   /**
@@ -365,7 +373,7 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
   }
 
   public void waitTillCacheServerIsReady(String serverName, int serverPort) {
-    await().atMost(1, TimeUnit.MINUTES)
+    await()
         .until(() -> getCacheServerMXBean(serverName, serverPort) != null);
   }
 
@@ -430,7 +438,7 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
 
 
   /**
-   * This method wraps an {@link org.awaitility.Awaitility#await} call for more meaningful error
+   * This method wraps an {@link GeodeAwaitility#await()} call for more meaningful error
    * reporting.
    *
    * @param supplier Method to retrieve the result to be tested, e.g.,
@@ -457,7 +465,6 @@ public abstract class MemberStarterRule<T> extends SerializableExternalResource 
       throws Exception {
     try {
       await(assertionConsumerDescription)
-          .atMost(timeout, unit)
           .untilAsserted(() -> assertionConsumer.accept(examiner.apply(supplier.get())));
     } catch (ConditionTimeoutException e) {
       // There is a very slight race condition here, where the above could conceivably time out,

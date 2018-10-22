@@ -15,10 +15,8 @@
 
 package org.apache.geode.management.cli.result;
 
-import static org.apache.geode.management.internal.cli.result.AbstractResultData.FILE_TYPE_BINARY;
-import static org.apache.geode.management.internal.cli.result.AbstractResultData.FILE_TYPE_TEXT;
-
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -150,16 +148,14 @@ public class ResultModel extends AbstractResultModel {
     this.files = files;
   }
 
-  public void addFile(String fileName, byte[] data, int fileType, String message) {
-    if (fileType != FILE_TYPE_BINARY && fileType != FILE_TYPE_TEXT) {
-      throw new IllegalArgumentException("Unsupported file type is specified.");
-    }
-
-    FileResultModel fileModel = new FileResultModel(fileName, data, fileType, message + fileName);
+  public void addFile(String fileName, String content) {
+    FileResultModel fileModel = new FileResultModel(fileName, content);
     files.put(fileName, fileModel);
   }
 
-
+  public void addFile(File file, int fileType) {
+    files.put(file.getName(), new FileResultModel(file, fileType));
+  }
 
   /**
    * Overloaded method to create an {@code InfoResultModel} section called "info".
@@ -189,10 +185,6 @@ public class ResultModel extends AbstractResultModel {
   public List<InfoResultModel> getInfoSections() {
     return sections.values().stream().filter(InfoResultModel.class::isInstance)
         .map(InfoResultModel.class::cast).collect(Collectors.toList());
-  }
-
-  public InfoResultModel getInfoSection(String name) {
-    return (InfoResultModel) sections.get(name);
   }
 
   public TabularResultModel addTable(String namedSection) {
@@ -255,7 +247,15 @@ public class ResultModel extends AbstractResultModel {
   }
 
   public TabularResultModel getTableSection(String name) {
-    return (TabularResultModel) sections.get(name);
+    return (TabularResultModel) getSection(name);
+  }
+
+  public InfoResultModel getInfoSection(String name) {
+    return (InfoResultModel) getSection(name);
+  }
+
+  public AbstractResultModel getSection(String name) {
+    return sections.get(name);
   }
 
   public DataResultModel addData(String namedSection) {
@@ -282,7 +282,7 @@ public class ResultModel extends AbstractResultModel {
   }
 
   public DataResultModel getDataSection(String name) {
-    return (DataResultModel) sections.get(name);
+    return (DataResultModel) getSection(name);
   }
 
   public List<String> getSectionNames() {
@@ -384,5 +384,36 @@ public class ResultModel extends AbstractResultModel {
     tabularResultModel.setHeader(header);
     tabularResultModel.setFooter(footer);
     return result;
+  }
+
+  /**
+   * this saves the file data in this result model to the specified directory, and add appropriate
+   * information to the result model to indicate the result of the file save.
+   *
+   */
+  public void saveFileTo(File dir) throws IOException {
+    if (getFiles().size() == 0 || dir == null) {
+      return;
+    }
+    InfoResultModel info = addInfo("fileSave");
+    if (!dir.exists() && !dir.mkdirs()) {
+      info.addLine(dir.getAbsolutePath() + " can not be created.");
+      setStatus(Result.Status.ERROR);
+      return;
+    }
+    if (!dir.isDirectory()) {
+      info.addLine(dir.getAbsolutePath() + " is not a directory.");
+      setStatus(Result.Status.ERROR);
+      return;
+    }
+    if (!dir.canWrite()) {
+      info.addLine("Can not write to " + dir.getAbsolutePath());
+      setStatus(Result.Status.ERROR);
+      return;
+    }
+
+    for (FileResultModel fileResult : files.values()) {
+      info.addLine(fileResult.saveFile(dir));
+    }
   }
 }
